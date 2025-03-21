@@ -1,6 +1,13 @@
+# dependencies
 node_modules
+
+# production
 dist
-.vscode
+
+# testing
 coverage/
 __tests__/temp/
-dist/
+
+# misc
+.DS_Store
+*.pem

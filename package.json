@@ -6,6 +6,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
+    "preinstall": "npx only-allow bun",
     "build": "bun run build.mts"
   },
   "files": [
@@ -25,6 +26,7 @@
   },
   "bugs": "https://github.com/InternetCommunityCompany/specify-publisher-sdk/issues",
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/bun": "^1.2.5",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.13.10",
