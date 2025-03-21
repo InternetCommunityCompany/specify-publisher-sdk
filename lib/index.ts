@@ -1,13 +1,15 @@
 import { AuthenticationError, ValidationError } from "./error";
 import type { SpecifyInitConfig } from "./types";
 
+type Address = `0x${string}`;
+
 /**
  * Specify Publisher SDK client
  *
  * Provides access to publisher content based on end user wallet address.
  */
 export default class Specify {
-  // Publisher API key used for authentication
+  // Publisher key used for authentication
   private readonly publisherKey: string;
 
   /**
@@ -39,7 +41,7 @@ export default class Specify {
    * @param address - Ethereum or EVM-compatible wallet address
    * @returns True if the address is valid, false otherwise
    */
-  private validateAddress(address: `0x${string}`): boolean {
+  private validateAddress(address: Address): boolean {
     const addressRegex = /^0x[a-fA-F0-9]{40}$/;
     return addressRegex.test(address);
   }
@@ -51,7 +53,7 @@ export default class Specify {
    * @throws {ValidationError} When wallet address format is invalid
    * @returns Ad content for the specified wallet address
    */
-  public async serve(address: `0x${string}`) {
+  public async serve(address: Address) {
     if (!this.validateAddress(address)) {
       throw new ValidationError("Invalid wallet address");
     }

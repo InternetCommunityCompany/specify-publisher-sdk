@@ -7,16 +7,11 @@
   "type": "module",
   "scripts": {
     "preinstall": "npx only-allow bun",
-    "build": "bun run build.mts"
+    "build": "bun run build.mts",
+    "test": "bun test"
   },
-  "files": [
-    "dist"
-  ],
-  "keywords": [
-    "specify",
-    "publisher-sdk",
-    "cptx"
-  ],
+  "files": ["dist"],
+  "keywords": ["specify", "publisher-sdk", "cptx"],
   "author": "Specify",
   "license": "MIT",
   "homepage": "https://specify.sh",
@@ -30,6 +25,7 @@
     "@types/bun": "^1.2.5",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.13.10",
+    "bun-types": "^1.2.5",
     "fs-extra": "^11.3.0",
     "typescript": "^5.8.2"
   }
