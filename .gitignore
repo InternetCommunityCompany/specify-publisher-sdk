@@ -1,0 +1,6 @@
+node_modules
+dist
+.vscode
+coverage/
+__tests__/temp/
+dist/
