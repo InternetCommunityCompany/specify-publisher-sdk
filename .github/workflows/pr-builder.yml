@@ -1,10 +1,9 @@
-name: 🚀 Release
+name: 📦 PR Builder
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 env:
   NPM_CONFIG_PROVENANCE: true
@@ -31,11 +30,3 @@ jobs:
         name: ✅ Run test
         run: |
           bun test
-
-      - name: 🔨 Build Package
-        run: bun run build
-
-      - name: 📤 Publish to NPM
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
