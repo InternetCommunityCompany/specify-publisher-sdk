@@ -15,7 +15,7 @@ jobs:
 
       - id: setup-bun
         name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -32,6 +32,6 @@ jobs:
         run: bun run build
 
       - name: Publish to NPM
-        uses: JS-DevTools/npm-publish@v1
+        uses: JS-DevTools/npm-publish@v3
         with:
           token: ${{ secrets.NPM_TOKEN }}
