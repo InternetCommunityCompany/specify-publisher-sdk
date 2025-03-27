@@ -1,17 +1,22 @@
 {
-    "compilerOptions": {
-      "target": "es2020",
-      "module": "ESNext",
-      "strict": true,
-      "esModuleInterop": true,
-      "moduleResolution": "Bundler",
-      "skipLibCheck": true,
-      "noUnusedLocals": true,
-      "noImplicitAny": true,
-      "allowJs": true,
-      "noEmit": true,
-      "outDir": "dist",
-      "resolveJsonModule": true,
-    }
-  }
-  
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "ESNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noImplicitAny": true,
+    "allowJs": true,
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
+  },
+  "include": ["lib/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

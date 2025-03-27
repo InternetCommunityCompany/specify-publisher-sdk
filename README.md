@@ -66,7 +66,7 @@ serveContent();
 
 Creates a new instance of the Specify client.
 
-- `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 28 characters)
+- `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 
 ### `specify.serve(address)`
 

@@ -1,7 +1,10 @@
-import { AuthenticationError, ValidationError } from "./error";
-import type { SpecifyInitConfig } from "./types";
+import fetch from "cross-fetch";
+import { APIError, AuthenticationError, ValidationError } from "./error";
+import type { SpecifyAd, SpecifyInitConfig } from "./types";
 
 type Address = `0x${string}`;
+
+const API_BASE_URL = "http://localhost:3000/api";
 
 /**
  * Specify Publisher SDK client
@@ -32,7 +35,7 @@ export default class Specify {
    * @returns True if the key is valid, false otherwise
    */
   private validatePublisherKey(key: string): boolean {
-    return key.startsWith("spk_") && key.length === 32;
+    return key.startsWith("spk_") && key.length === 34;
   }
 
   /**
@@ -51,22 +54,45 @@ export default class Specify {
    *
    * @param address - Ethereum or EVM-compatible wallet address
    * @throws {ValidationError} When wallet address format is invalid
-   * @returns Ad content for the specified wallet address
+   * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(address: Address) {
+  public async serve(address: Address): Promise<SpecifyAd | null> {
     if (!this.validateAddress(address)) {
       throw new ValidationError("Invalid wallet address");
     }
 
-    // TODO: Implement the API call to the Specify publisher API
-    console.log("Using publisher key:", this.publisherKey); // TODO: Remove this, added for avoiding linting error
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/ads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.publisherKey,
+        },
+        body: JSON.stringify({ walletAddress: address }),
+      });
 
-    // TODO: Replace with actual API response
-    return {
-      headline: "Sample Headline",
-      content: "This is some sample content",
-      image: "https://specify.sh/sample.jpg",
-    };
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+
+        throw new APIError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      return data as SpecifyAd;
+    } catch (error) {
+      // If it's already an APIError (from our !response.ok check), just rethrow it
+      if (error instanceof APIError) {
+        throw error;
+      }
+      // For network errors or other fetch failures
+      throw new APIError(
+        `Failed to fetch ad content: ${error instanceof Error ? error.message : "Unknown error"}`,
+        error instanceof Error && "status" in error ? (error as { status: number }).status : 0,
+      );
+    }
   }
 }
 

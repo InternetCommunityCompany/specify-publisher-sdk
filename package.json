@@ -1,6 +1,6 @@
 {
-  "name": "specify-publisher-sdk",
-  "version": "0.0.1",
+  "name": "specify-publisher-sdk-test",
+  "version": "0.1.11",
   "description": "JS SDK for Specify Publishers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,5 +28,8 @@
     "bun-types": "^1.2.5",
     "fs-extra": "^11.3.0",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "cross-fetch": "3.0.4"
   }
 }
