@@ -33,6 +33,6 @@ jobs:
         run: bun run build
 
       - name: 📤 Publish to NPM
-        run: npm publish
+        run: JS-DevTools/npm-publish@v3
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          token: ${{ secrets.NPM_TOKEN }}
