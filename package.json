@@ -1,6 +1,6 @@
 {
   "name": "specify-publisher-sdk-test",
-  "version": "0.1.11",
+  "version": "0.1.0",
   "description": "JS SDK for Specify Publishers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
