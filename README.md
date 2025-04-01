@@ -6,8 +6,12 @@
   </p>
 
   <div>
-    <img alt="Version JSON Badge" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Finternetcommunitycompany%2Fspecify-publisher-sdk%2Fmain%2Fpackage.json&query=%24.version&label=Version">
-    <img alt="Release Workflow Status" src="https://img.shields.io/github/actions/workflow/status/internetcommunitycompany/specify-publisher-sdk/release.yml?style=flat&label=Release">
+  <a href="https://github.com/InternetCommunityCompany/specify-publisher-sdk">
+     <img alt="Version JSON Badge" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Finternetcommunitycompany%2Fspecify-publisher-sdk%2Fmain%2Fpackage.json&query=%24.version&label=Version">
+    </a>
+    <a href="https://github.com/InternetCommunityCompany/specify-publisher-sdk">
+     <img alt="Release Workflow Status" src="https://img.shields.io/github/actions/workflow/status/internetcommunitycompany/specify-publisher-sdk/release.yml?style=flat&label=Release">
+    </a>
   </div>
 </div>
 
@@ -15,7 +19,7 @@
 
 > Now in beta!
 
-The Specify Publisher SDK enables publishers to serve targeted content to users based on their wallet addresses. It provides a simple and elegant API for web3-enabled applications.
+The Specify Publisher SDK enables publishers to serve targeted ad content to users based on their wallet addresses.
 
 ## Installation
 
@@ -73,7 +77,7 @@ Creates a new instance of the Specify client.
 Serves content based on the provided wallet address.
 
 - `address` - Ethereum or EVM-compatible wallet address (format: `0x` followed by 40 hexadecimal characters)
-- Returns: Promise resolving to content object
+- Returns: Promise resolving to ad content object
 
 ---
 
