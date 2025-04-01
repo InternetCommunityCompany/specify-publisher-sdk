@@ -25,20 +25,20 @@ The Specify Publisher SDK enables publishers to serve targeted ad content to use
 
 ```bash
 # Using bun
-bun add @specify/sdk
+bun add @specify-sh/sdk
 
 # Using npm
-npm install @specify/sdk
+npm install @specify-sh/sdk
 
 # Using yarn
-yarn add @specify/sdk
+yarn add @specify-sh/sdk
 
 ```
 
 ## Basic Usage
 
 ```js
-import Specify, { AuthenticationError, ValidationError } from "@specify/sdk";
+import Specify, { AuthenticationError, ValidationError } from "@specify-sh/sdk";
 
 // Initialize with your publisher key
 const specify = new Specify({
