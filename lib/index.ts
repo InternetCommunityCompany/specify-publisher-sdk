@@ -77,6 +77,10 @@ export default class Specify {
           return null;
         }
 
+        if (response.status === 401) {
+          throw new AuthenticationError("Invalid API key");
+        }
+
         throw new APIError(`HTTP error! status: ${response.status}`, response.status);
       }
 
