@@ -102,6 +102,10 @@ bun test
 bun run build
 ```
 
+## Examples
+
+Check out our [examples repository](https://github.com/InternetCommunityCompany/specify-publisher-sdk-examples) for complete implementation examples in different frameworks and environments.
+
 ## License
 
-MIT 
+MIT
