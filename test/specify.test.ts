@@ -13,6 +13,8 @@ interface MockSpecifyAd {
   ctaUrl?: string;
   ctaLabel?: string;
   error?: string;
+  communityName?: string;
+  communityLogo?: string;
 }
 
 describe("Specify", () => {
@@ -60,6 +62,8 @@ describe("Specify", () => {
         imageId: "bored1234",
         ctaUrl: "https://boredapeyachtclub.com/collection",
         ctaLabel: "Mint Now",
+        communityName: "Outposts",
+        communityLogo: "https://outpostscdn.com/file/outposts/8b44e98c-6753-4d00-91a7-811347bf0888/logos/bbafcd7b-e52c-4e4f-8764-8f45187825f6"
       };
 
       setupMockFetch<MockSpecifyAd>(mockResponse);

@@ -11,4 +11,6 @@ export interface SpecifyAd {
   ctaUrl: string;
   ctaLabel: string;
   imageUrl: string;
+  communityName: string;
+  communityLogo: string;
 }
