@@ -1,4 +1,3 @@
-import fetch from "cross-fetch";
 import { APIError, AuthenticationError, ValidationError } from "./error";
 import type { SpecifyAd, SpecifyInitConfig } from "./types";
 
