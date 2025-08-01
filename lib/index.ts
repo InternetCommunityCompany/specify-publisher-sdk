@@ -4,7 +4,7 @@ import type { SpecifyAd, SpecifyInitConfig } from "./types";
 
 type Address = `0x${string}`;
 
-const API_BASE_URL = "http://app.specify.sh/api";
+const API_BASE_URL = "https://app.specify.sh/api";
 
 /**
  * Specify Publisher SDK client
