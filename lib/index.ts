@@ -1,5 +1,5 @@
 import { APIError, AuthenticationError, ValidationError } from "./error";
-import type { SpecifyAd, SpecifyInitConfig } from "./types";
+import type { SpecifyAd, SpecifyInitConfig, ImageFormat } from "./types";
 
 type Address = `0x${string}`;
 
@@ -52,10 +52,11 @@ export default class Specify {
    * Serves content to the specified wallet address
    *
    * @param address - Ethereum or EVM-compatible wallet address
+   * @param imageFormat - Image format to serve
    * @throws {ValidationError} When wallet address format is invalid
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(address: Address): Promise<SpecifyAd | null> {
+  public async serve(address: Address, imageFormat: ImageFormat): Promise<SpecifyAd | null> {
     if (!this.validateAddress(address)) {
       throw new ValidationError("Invalid wallet address");
     }
@@ -68,7 +69,7 @@ export default class Specify {
           "Content-Type": "application/json",
           "x-api-key": this.publisherKey,
         },
-        body: JSON.stringify({ walletAddress: address }),
+        body: JSON.stringify({ walletAddress: address, imageFormat }),
       });
 
       if (!response.ok) {
