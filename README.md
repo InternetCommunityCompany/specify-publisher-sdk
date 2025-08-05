@@ -38,7 +38,7 @@ yarn add @specify-sh/sdk
 ## Basic Usage
 
 ```js
-import Specify, { AuthenticationError, ValidationError, NotFoundError, APIError } from "@specify-sh/sdk";
+import Specify, { AuthenticationError, ValidationError, NotFoundError, APIError, ImageFormat } from "@specify-sh/sdk";
 
 // Initialize with your publisher key
 const specify = new Specify({
@@ -49,7 +49,7 @@ const specify = new Specify({
 async function serveContent() {
   try {
     const walletAddress = "0x1234567890123456789012345678901234567890";
-    const content = await specify.serve(walletAddress);
+    const content = await specify.serve([walletAddress], ImageFormat.LANDSCAPE);
   } catch (error) {
     if (error instanceof AuthenticationError) {
       // Handle authentication errors
@@ -80,7 +80,7 @@ const addresses = [
   "0x9876543210987654321098765432109876543210"
 ];
 
-const content = await specify.serve(addresses);
+const content = await specify.serve(addresses, ImageFormat.SQUARE);
 ```
 
 ## API Reference
@@ -91,13 +91,14 @@ Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 
-### `specify.serve(addressOrAddresses)`
+### `specify.serve(addressOrAddresses, imageFormat)`
 
 Serves content based on the provided wallet address(es).
 
 - `addressOrAddresses` - Single wallet address or array of wallet addresses (max 50 addresses)
   - Format: `0x` followed by 40 hexadecimal characters
   - Duplicate addresses are automatically removed
+- `imageFormat` - Required image format from the `ImageFormat` enum
 - Returns: Promise resolving to ad content object (throws `NotFoundError` if no ad is found)
 
 #### Response Object
@@ -114,8 +115,19 @@ interface SpecifyAd {
   imageUrl: string;
   communityName: string;
   communityLogo: string;
+  imageFormat: "LANDSCAPE" | "SQUARE" | "LONG_BANNER" | "SHORT_BANNER" | "NO_IMAGE";
 }
 ```
+
+### `ImageFormat` Enum
+
+The `ImageFormat` enum defines the available image format options:
+
+- `ImageFormat.LANDSCAPE` - 16:9 - Landscape-oriented images
+- `ImageFormat.SQUARE` - 1:1 - Square images
+- `ImageFormat.LONG_BANNER` - 8:1 - Long banner format
+- `ImageFormat.SHORT_BANNER` - 16:5 - Short banner format
+- `ImageFormat.NO_IMAGE` - No image, text-only ads
 
 ### Error Types
 

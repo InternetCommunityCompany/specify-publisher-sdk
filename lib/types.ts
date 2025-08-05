@@ -21,6 +21,7 @@ export interface SpecifyAd {
   imageUrl: string;
   communityName: string;
   communityLogo: string;
+  imageFormat: keyof typeof ImageFormat;
 }
 
 export interface APIErrorResponse {
