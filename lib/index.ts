@@ -1,7 +1,5 @@
-import { APIError, AuthenticationError, ValidationError } from "./error";
-import type { SpecifyAd, SpecifyInitConfig } from "./types";
-
-type Address = `0x${string}`;
+import { APIError, AuthenticationError, NotFoundError, ValidationError } from "./error";
+import type { APIErrorResponse, Address, SpecifyAd, SpecifyInitConfig } from "./types";
 
 const API_BASE_URL = "https://app.specify.sh/api";
 
@@ -49,15 +47,41 @@ export default class Specify {
   }
 
   /**
-   * Serves content to the specified wallet address
+   * Validates an array of wallet addresses
    *
-   * @param address - Ethereum or EVM-compatible wallet address
+   * @param addresses - Array of Ethereum or EVM-compatible wallet addresses
+   * @returns True if all addresses are valid, false otherwise
+   */
+  private validateAddresses(addresses: Address[]): boolean {
+    return addresses.every((address) => this.validateAddress(address));
+  }
+
+  /**
+   * Serves content to the specified wallet address(es)
+   *
+   * @param addressOrAddresses - Single wallet address or array of wallet addresses
    * @throws {ValidationError} When wallet address format is invalid
+   * @throws {NotFoundError} When no ad is found for the address(es)
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(address: Address): Promise<SpecifyAd | null> {
-    if (!this.validateAddress(address)) {
-      throw new ValidationError("Invalid wallet address");
+  public async serve(addressOrAddresses: Address | Address[]): Promise<SpecifyAd | null> {
+    const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
+
+    // Validate all addresses
+    if (!this.validateAddresses(addresses)) {
+      throw new ValidationError("Invalid wallet address format");
+    }
+
+    // Deduplicate addresses
+    const uniqueAddresses = [...new Set(addresses)];
+
+    // Check limits
+    if (uniqueAddresses.length === 0) {
+      throw new ValidationError("At least one wallet address is required");
+    }
+
+    if (uniqueAddresses.length > 50) {
+      throw new ValidationError("Maximum 50 wallet addresses allowed");
     }
 
     let response: Response;
@@ -68,16 +92,21 @@ export default class Specify {
           "Content-Type": "application/json",
           "x-api-key": this.publisherKey,
         },
-        body: JSON.stringify({ walletAddress: address }),
+        body: JSON.stringify({ walletAddresses: uniqueAddresses }),
       });
 
       if (!response.ok) {
         if (response.status === 404) {
-          return null;
+          throw new NotFoundError();
         }
 
         if (response.status === 401) {
           throw new AuthenticationError("Invalid API key");
+        }
+
+        if (response.status === 400) {
+          const errorData: APIErrorResponse = await response.json();
+          throw new ValidationError(errorData.error || "Invalid request", errorData.details);
         }
 
         throw new APIError(`HTTP error! status: ${response.status}`, response.status);
@@ -86,8 +115,13 @@ export default class Specify {
       const data = await response.json();
       return data as SpecifyAd;
     } catch (error) {
-      // If it's already an APIError (from our !response.ok check), just rethrow it
-      if (error instanceof APIError) {
+      // If it's already one of our custom errors, just rethrow it
+      if (
+        error instanceof APIError ||
+        error instanceof AuthenticationError ||
+        error instanceof ValidationError ||
+        error instanceof NotFoundError
+      ) {
         throw error;
       }
       // For network errors or other fetch failures
