@@ -184,7 +184,6 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>({ error: "Not Found" }, 404);
 
-      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE)).resolves.toBeNull();
       await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE)).rejects.toThrow(NotFoundError);
     });
 
