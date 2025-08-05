@@ -1,5 +1,5 @@
 import { APIError, AuthenticationError, NotFoundError, ValidationError } from "./error";
-import type { APIErrorResponse, Address, SpecifyAd, SpecifyInitConfig } from "./types";
+import type { APIErrorResponse, Address, ImageFormat, SpecifyAd, SpecifyInitConfig } from "./types";
 
 const API_BASE_URL = "https://app.specify.sh/api";
 
@@ -50,6 +50,7 @@ export default class Specify {
    * Validates an array of wallet addresses
    *
    * @param addresses - Array of Ethereum or EVM-compatible wallet addresses
+   * @param imageFormat - Image format to serve
    * @returns True if all addresses are valid, false otherwise
    */
   private validateAddresses(addresses: Address[]): boolean {
@@ -64,7 +65,7 @@ export default class Specify {
    * @throws {NotFoundError} When no ad is found for the address(es)
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(addressOrAddresses: Address | Address[]): Promise<SpecifyAd | null> {
+  public async serve(addressOrAddresses: Address | Address[], imageFormat: ImageFormat): Promise<SpecifyAd | null> {
     const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
 
     // Validate all addresses
@@ -92,7 +93,7 @@ export default class Specify {
           "Content-Type": "application/json",
           "x-api-key": this.publisherKey,
         },
-        body: JSON.stringify({ walletAddresses: uniqueAddresses }),
+        body: JSON.stringify({ walletAddresses: uniqueAddresses, imageFormat }),
       });
 
       if (!response.ok) {
