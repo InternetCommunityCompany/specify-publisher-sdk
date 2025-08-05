@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import Specify, { APIError, AuthenticationError, ValidationError } from "../lib";
+import Specify, { APIError, AuthenticationError, NotFoundError, ValidationError } from "../lib";
 import { VALID_MOCK_PUBLISHER_KEY, VALID_MOCK_WALLET_ADDRESS } from "./consts";
 import { setupMockFetch } from "./helpers";
 
@@ -63,7 +63,8 @@ describe("Specify", () => {
         ctaUrl: "https://boredapeyachtclub.com/collection",
         ctaLabel: "Mint Now",
         communityName: "Outposts",
-        communityLogo: "https://outpostscdn.com/file/outposts/8b44e98c-6753-4d00-91a7-811347bf0888/logos/bbafcd7b-e52c-4e4f-8764-8f45187825f6"
+        communityLogo:
+          "https://outpostscdn.com/file/outposts/8b44e98c-6753-4d00-91a7-811347bf0888/logos/bbafcd7b-e52c-4e4f-8764-8f45187825f6",
       };
 
       setupMockFetch<MockSpecifyAd>(mockResponse);
@@ -97,7 +98,7 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>({ error: "Not Found" }, 404);
 
-      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS)).resolves.toBeNull();
+      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS)).rejects.toThrow(NotFoundError);
     });
 
     it("should throw APIError with status code for HTTP errors", async () => {
