@@ -22,3 +22,13 @@ export interface SpecifyAd {
   communityName: string;
   communityLogo: string;
 }
+
+export interface APIErrorResponse {
+  error: string;
+  details?: Array<{
+    field: string;
+    message: string;
+  }>;
+}
+
+export type Address = `0x${string}`;
