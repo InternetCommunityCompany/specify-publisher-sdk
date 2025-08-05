@@ -38,7 +38,7 @@ yarn add @specify-sh/sdk
 ## Basic Usage
 
 ```js
-import Specify, { AuthenticationError, ValidationError } from "@specify-sh/sdk";
+import Specify, { AuthenticationError, ValidationError, NotFoundError, APIError } from "@specify-sh/sdk";
 
 // Initialize with your publisher key
 const specify = new Specify({
@@ -55,13 +55,32 @@ async function serveContent() {
       // Handle authentication errors
     } else if (error instanceof ValidationError) {
       // Handle validation errors
+    } else if (error instanceof NotFoundError) {
+      // Handle no ad found error
+    } else if (error instanceof APIError) {
+      // Handle API errors
     } else {
-        // Handle other errors
+      // Handle other errors
     }
   }
 }
 
 serveContent();
+```
+
+## Advanced Usage
+
+### Serving content to multiple addresses
+
+```js
+// Serve content to multiple wallet addresses (max 50)
+const addresses = [
+  "0x1234567890123456789012345678901234567890",
+  "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  "0x9876543210987654321098765432109876543210"
+];
+
+const content = await specify.serve(addresses);
 ```
 
 ## API Reference
@@ -72,12 +91,38 @@ Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 
-### `specify.serve(address)`
+### `specify.serve(addressOrAddresses)`
 
-Serves content based on the provided wallet address.
+Serves content based on the provided wallet address(es).
 
-- `address` - Ethereum or EVM-compatible wallet address (format: `0x` followed by 40 hexadecimal characters)
-- Returns: Promise resolving to ad content object
+- `addressOrAddresses` - Single wallet address or array of wallet addresses (max 50 addresses)
+  - Format: `0x` followed by 40 hexadecimal characters
+  - Duplicate addresses are automatically removed
+- Returns: Promise resolving to ad content object (throws `NotFoundError` if no ad is found)
+
+#### Response Object
+
+```typescript
+interface SpecifyAd {
+  walletAddress: string;
+  campaignId: string;
+  adId: string;
+  headline: string;
+  content: string;
+  ctaUrl: string;
+  ctaLabel: string;
+  imageUrl: string;
+  communityName: string;
+  communityLogo: string;
+}
+```
+
+### Error Types
+
+- `AuthenticationError` - Invalid API key format or authentication failure
+- `ValidationError` - Invalid wallet address format, empty address array, or too many addresses (>50)
+- `NotFoundError` - No ad found for the provided address(es)
+- `APIError` - Network errors or other HTTP errors
 
 ---
 
