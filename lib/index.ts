@@ -61,11 +61,16 @@ export default class Specify {
    * Serves content to the specified wallet address(es)
    *
    * @param addressOrAddresses - Single wallet address or array of wallet addresses
+   * @param adUnitId - arbitrary string id to identify where the ad is being displayed
    * @throws {ValidationError} When wallet address format is invalid
    * @throws {NotFoundError} When no ad is found for the address(es)
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(addressOrAddresses: Address | Address[], imageFormat: ImageFormat): Promise<SpecifyAd | null> {
+  public async serve(
+    addressOrAddresses: Address | Address[],
+    imageFormat: ImageFormat,
+    adUnitId?: string,
+  ): Promise<SpecifyAd | null> {
     const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
 
     // Validate all addresses
@@ -93,7 +98,7 @@ export default class Specify {
           "Content-Type": "application/json",
           "x-api-key": this.publisherKey,
         },
-        body: JSON.stringify({ walletAddresses: uniqueAddresses, imageFormat }),
+        body: JSON.stringify({ walletAddresses: uniqueAddresses, imageFormat, adUnitId }),
       });
 
       if (!response.ok) {

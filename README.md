@@ -80,7 +80,7 @@ const addresses = [
   "0x9876543210987654321098765432109876543210"
 ];
 
-const content = await specify.serve(addresses, ImageFormat.SQUARE);
+const content = await specify.serve(addresses, ImageFormat.SQUARE, ad_unit_id);
 ```
 
 ## API Reference
@@ -91,7 +91,7 @@ Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 
-### `specify.serve(addressOrAddresses, imageFormat)`
+### `specify.serve(addressOrAddresses, imageFormat, adUnitId)`
 
 Serves content based on the provided wallet address(es).
 
@@ -99,6 +99,7 @@ Serves content based on the provided wallet address(es).
   - Format: `0x` followed by 40 hexadecimal characters
   - Duplicate addresses are automatically removed
 - `imageFormat` - Required image format from the `ImageFormat` enum
+- `adUnitId` - Optional arbitrary string identifier to identify where the ad is being displayed
 - Returns: Promise resolving to ad content object (throws `NotFoundError` if no ad is found)
 
 #### Response Object
@@ -115,7 +116,8 @@ interface SpecifyAd {
   imageUrl: string;
   communityName: string;
   communityLogo: string;
-  imageFormat: "LANDSCAPE" | "SQUARE" | "LONG_BANNER" | "SHORT_BANNER" | "NO_IMAGE";
+  imageFormat: "LANDSCAPE" | "SQUARE" | "LONG_BANNER" | "SHORT_BANNER" | "NO_IMAGE";  
+  adUnitId?: string;
 }
 ```
 
@@ -128,6 +130,10 @@ The `ImageFormat` enum defines the available image format options:
 - `ImageFormat.LONG_BANNER` - 8:1 - Long banner format
 - `ImageFormat.SHORT_BANNER` - 16:5 - Short banner format
 - `ImageFormat.NO_IMAGE` - No image, text-only ads
+
+### `adUnitId` String
+- Optional
+- Arbitrary string identifier to identify where the ad is being displayed
 
 ### Error Types
 
