@@ -49,7 +49,7 @@ const specify = new Specify({
 async function serveContent() {
   try {
     const walletAddress = "0x1234567890123456789012345678901234567890";
-    const content = await specify.serve([walletAddress], ImageFormat.LANDSCAPE);
+    const content = await specify.serve([walletAddress], {imageFormat: ImageFormat.LANDSCAPE, adUnitId: "header-banner-1"});
   } catch (error) {
     if (error instanceof AuthenticationError) {
       // Handle authentication errors
@@ -91,7 +91,7 @@ Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 
-### `specify.serve(addressOrAddresses, imageFormat, adUnitId)`
+### `specify.serve(addressOrAddresses, {imageFormat, adUnitId})`
 
 Serves content based on the provided wallet address(es).
 
