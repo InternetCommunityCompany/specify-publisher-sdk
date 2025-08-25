@@ -3,6 +3,11 @@ import type { APIErrorResponse, Address, ImageFormat, SpecifyAd, SpecifyInitConf
 
 const API_BASE_URL = "https://app.specify.sh/api";
 
+interface ServeOptions {
+  imageFormat: ImageFormat;
+  adUnitId?: string;
+}
+
 /**
  * Specify Publisher SDK client
  *
@@ -50,7 +55,6 @@ export default class Specify {
    * Validates an array of wallet addresses
    *
    * @param addresses - Array of Ethereum or EVM-compatible wallet addresses
-   * @param imageFormat - Image format to serve
    * @returns True if all addresses are valid, false otherwise
    */
   private validateAddresses(addresses: Address[]): boolean {
@@ -61,11 +65,14 @@ export default class Specify {
    * Serves content to the specified wallet address(es)
    *
    * @param addressOrAddresses - Single wallet address or array of wallet addresses
+   * @param options - Configuration options containing imageFormat and optional adUnitId
+   * @param options.imageFormat - The desired image format for the ad
+   * @param options.adUnitId - arbitrary string id to identify where the ad is being displayed
    * @throws {ValidationError} When wallet address format is invalid
    * @throws {NotFoundError} When no ad is found for the address(es)
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(addressOrAddresses: Address | Address[], imageFormat: ImageFormat): Promise<SpecifyAd | null> {
+  public async serve(addressOrAddresses: Address | Address[], options: ServeOptions): Promise<SpecifyAd | null> {
     const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
 
     // Validate all addresses
@@ -93,7 +100,11 @@ export default class Specify {
           "Content-Type": "application/json",
           "x-api-key": this.publisherKey,
         },
-        body: JSON.stringify({ walletAddresses: uniqueAddresses, imageFormat }),
+        body: JSON.stringify({
+          walletAddresses: uniqueAddresses,
+          imageFormat: options.imageFormat,
+          adUnitId: options.adUnitId,
+        }),
       });
 
       if (!response.ok) {
