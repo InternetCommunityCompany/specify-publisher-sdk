@@ -69,7 +69,6 @@ export default class Specify {
    * @param options.imageFormat - The desired image format for the ad
    * @param options.adUnitId - arbitrary string id to identify where the ad is being displayed
    * @throws {ValidationError} When wallet address format is invalid
-   * @throws {NotFoundError} When no ad is found for the address(es)
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
   public async serve(addressOrAddresses: Address | Address[], options: ServeOptions): Promise<SpecifyAd | null> {
@@ -109,11 +108,11 @@ export default class Specify {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new NotFoundError();
+          return null;
         }
 
         if (response.status === 401) {
-          throw new AuthenticationError("Invalid API key");
+          throw new AuthenticationError("Invalid Publisher key");
         }
 
         if (response.status === 400) {
