@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import Specify, { APIError, AuthenticationError, ValidationError, ImageFormat, NotFoundError } from "../lib";
+import Specify, { APIError, AuthenticationError, ValidationError, ImageFormat, type Address } from "../lib";
 import { VALID_MOCK_PUBLISHER_KEY, VALID_MOCK_WALLET_ADDRESS } from "./consts";
 import { setupMockFetch } from "./helpers";
 
@@ -69,7 +69,7 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>(mockResponse);
 
-      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE);
+      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LANDSCAPE });
 
       expect(content).toBeDefined();
       expect(content).toHaveProperty("walletAddress", VALID_MOCK_WALLET_ADDRESS);
@@ -108,7 +108,7 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>(mockResponse);
 
-      const content = await specify.serve([VALID_MOCK_WALLET_ADDRESS], ImageFormat.LANDSCAPE);
+      const content = await specify.serve([VALID_MOCK_WALLET_ADDRESS], { imageFormat: ImageFormat.LANDSCAPE });
 
       expect(content).toBeDefined();
       expect(content).toHaveProperty("walletAddress", VALID_MOCK_WALLET_ADDRESS);
@@ -136,10 +136,9 @@ describe("Specify", () => {
       setupMockFetch<MockSpecifyAd>(mockResponse);
 
       // Pass the same address multiple times
-      const content = await specify.serve(
-        [VALID_MOCK_WALLET_ADDRESS, VALID_MOCK_WALLET_ADDRESS],
-        ImageFormat.LANDSCAPE,
-      );
+      const content = await specify.serve([VALID_MOCK_WALLET_ADDRESS, VALID_MOCK_WALLET_ADDRESS], {
+        imageFormat: ImageFormat.LANDSCAPE,
+      });
 
       expect(content).toBeDefined();
       expect(content).toHaveProperty("walletAddress", VALID_MOCK_WALLET_ADDRESS);
@@ -150,10 +149,12 @@ describe("Specify", () => {
         publisherKey: VALID_MOCK_PUBLISHER_KEY,
       });
 
-      await expect(specify.serve("invalid_address" as `0x${string}`, ImageFormat.LANDSCAPE)).rejects.toThrow(
+      await expect(specify.serve("invalid_address" as Address, { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(
         ValidationError,
       );
-      await expect(specify.serve("0xinvalid" as `0x${string}`, ImageFormat.LANDSCAPE)).rejects.toThrow(ValidationError);
+      await expect(specify.serve("0xinvalid" as Address, { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(
+        ValidationError,
+      );
     });
 
     it("should throw ValidationError for empty address array", async () => {
@@ -161,7 +162,7 @@ describe("Specify", () => {
         publisherKey: VALID_MOCK_PUBLISHER_KEY,
       });
 
-      await expect(specify.serve([], ImageFormat.LANDSCAPE)).rejects.toThrow(ValidationError);
+      await expect(specify.serve([], { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(ValidationError);
     });
 
     it("should throw ValidationError for too many addresses", async () => {
@@ -169,12 +170,11 @@ describe("Specify", () => {
         publisherKey: VALID_MOCK_PUBLISHER_KEY,
       });
 
-      const manyAddresses = Array.from(
-        { length: 51 },
-        (_, i) => `0x${i.toString().padStart(40, "0")}` as `0x${string}`,
-      );
+      const manyAddresses = Array.from({ length: 51 }, (_, i) => `0x${i.toString().padStart(40, "0")}` as Address);
 
-      await expect(specify.serve(manyAddresses, ImageFormat.LANDSCAPE)).rejects.toThrow(ValidationError);
+      await expect(specify.serve(manyAddresses, { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(
+        ValidationError,
+      );
     });
 
     it("should throw NotFoundError when ad is not found", async () => {
@@ -184,7 +184,8 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>({ error: "Not Found" }, 404);
 
-      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE)).rejects.toThrow(NotFoundError);
+      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LANDSCAPE });
+      expect(content).toBeNull();
     });
 
     it("should throw AuthenticationError for 401 status", async () => {
@@ -194,7 +195,7 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>({ error: "Unauthorized" }, 401);
 
-      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE)).rejects.toThrow(
+      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(
         AuthenticationError,
       );
     });
@@ -211,7 +212,9 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>(errorResponse, 400);
 
-      const error = await specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE).catch((e) => e);
+      const error = await specify
+        .serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LANDSCAPE })
+        .catch((e) => e);
       expect(error).toBeInstanceOf(ValidationError);
       expect(error.details).toEqual(errorResponse.details);
     });
@@ -223,7 +226,9 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>({ error: "Internal Server Error" }, 500);
 
-      const error = await specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE).catch((e) => e);
+      const error = await specify
+        .serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LANDSCAPE })
+        .catch((e) => e);
       expect(error).toBeInstanceOf(APIError);
       expect(error.status).toBe(500);
     });
@@ -235,7 +240,9 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>({ error: "Network error" }, 0);
 
-      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.LANDSCAPE)).rejects.toThrow(APIError);
+      await expect(specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(
+        APIError,
+      );
     });
 
     it("should return content when imageFormat is provided", async () => {
@@ -256,7 +263,7 @@ describe("Specify", () => {
 
       setupMockFetch<MockSpecifyAd>(mockResponse);
 
-      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, ImageFormat.SQUARE);
+      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.SQUARE });
 
       expect(content).toBeDefined();
       expect(content).toHaveProperty("walletAddress", VALID_MOCK_WALLET_ADDRESS);
@@ -291,7 +298,7 @@ describe("Specify", () => {
 
         setupMockFetch<MockSpecifyAd>(mockResponse);
 
-        const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, format);
+        const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: format });
 
         expect(content).toBeDefined();
         expect(content).toHaveProperty("headline", `Test Ad with ${format}`);
