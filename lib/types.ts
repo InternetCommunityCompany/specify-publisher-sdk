@@ -1,5 +1,6 @@
 export interface SpecifyInitConfig {
   publisherKey: string;
+  memorizeWalletsAcrossRequests?: boolean;
 }
 
 export enum ImageFormat {

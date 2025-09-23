@@ -40,7 +40,7 @@ yarn add @specify-sh/sdk
 ```js
 import Specify, { AuthenticationError, ValidationError, NotFoundError, APIError, ImageFormat } from "@specify-sh/sdk";
 
-// Initialize with your publisher key
+// Initialize with your publisher key and enable wallet memory (true by default)
 const specify = new Specify({
   publisherKey: "your_publisher_key",
 });
@@ -49,7 +49,12 @@ const specify = new Specify({
 async function serveContent() {
   try {
     const walletAddress = "0x1234567890123456789012345678901234567890";
+
+    // Serve content with a provided wallet address + SDK memory.
     const content = await specify.serve([walletAddress], {imageFormat: ImageFormat.LANDSCAPE, adUnitId: "header-banner-1"});
+
+    // Serve content solely relying on SDK memory for wallets.
+    const contentFromMemory = await specify.serve(undefined, {imageFormat: ImageFormat.SQUARE, adUnitId: "sidebar-ad-1"});
   } catch (error) {
     if (error instanceof AuthenticationError) {
       // Handle authentication errors
@@ -73,14 +78,18 @@ serveContent();
 ### Serving content to multiple addresses
 
 ```js
-// Serve content to multiple wallet addresses (max 50)
+// Serve content to multiple wallet addresses (max 50). The SDK will remember these by default.
 const addresses = [
   "0x1234567890123456789012345678901234567890",
   "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
   "0x9876543210987654321098765432109876543210"
 ];
 
-const content = await specify.serve(addresses, ImageFormat.SQUARE, ad_unit_id);
+// Serve content with multiple provided addresses + SDK memory.
+const content = await specify.serve(addresses, {imageFormat: ImageFormat.SQUARE, adUnitId: "ad-unit-2"});
+
+// Serve content solely relying on SDK memory for wallets.
+const contentFromMemoryMultiple = await specify.serve(undefined, {imageFormat: ImageFormat.LONG_BANNER, adUnitId: "ad-unit-3"});
 ```
 
 ## API Reference
@@ -90,12 +99,13 @@ const content = await specify.serve(addresses, ImageFormat.SQUARE, ad_unit_id);
 Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
+- `config.memorizeWalletsAcrossRequests` - Optional boolean, defaults to `true`. Set to `false` to disable wallet address memory across requests.
 
 ### `specify.serve(addressOrAddresses, {imageFormat, adUnitId})`
 
 Serves content based on the provided wallet address(es).
 
-- `addressOrAddresses` - Single wallet address or array of wallet addresses (max 50 addresses)
+- `addressOrAddresses` - Optional. Single wallet address, array of wallet addresses (can be empty), or `undefined` if relying solely on SDK memory (max 50 addresses). If `memorizeWalletsAcrossRequests` is `true`, provided addresses will be merged with previously stored addresses.
   - Format: `0x` followed by 40 hexadecimal characters
   - Duplicate addresses are automatically removed
 - `imageFormat` - Required image format from the `ImageFormat` enum
@@ -138,7 +148,7 @@ The `ImageFormat` enum defines the available image format options:
 ### Error Types
 
 - `AuthenticationError` - Invalid API key format or authentication failure
-- `ValidationError` - Invalid wallet address format, empty address array, or too many addresses (>50)
+- `ValidationError` - Invalid wallet address format, or too many addresses (>50)
 - `NotFoundError` - No ad found for the provided address(es)
 - `APIError` - Network errors or other HTTP errors
 

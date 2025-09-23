@@ -1,5 +1,7 @@
 import { APIError, AuthenticationError, NotFoundError, ValidationError } from "./error";
+import { getStoredWalletAddresses, setStoredWalletAddresses } from "./storage";
 import type { APIErrorResponse, Address, ImageFormat, SpecifyAd, SpecifyInitConfig } from "./types";
+import { isClient } from "./utils";
 
 const API_BASE_URL = "https://app.specify.sh/api";
 
@@ -16,6 +18,7 @@ interface ServeOptions {
 export default class Specify {
   // Publisher key used for authentication
   private readonly publisherKey: string;
+  private readonly memorizeWalletsAcrossRequests: boolean;
 
   /**
    * Creates a new Specify client instance
@@ -28,6 +31,7 @@ export default class Specify {
       throw new AuthenticationError("Invalid API key format");
     }
     this.publisherKey = config.publisherKey;
+    this.memorizeWalletsAcrossRequests = config.memorizeWalletsAcrossRequests ?? true;
   }
 
   /**
@@ -64,23 +68,47 @@ export default class Specify {
   /**
    * Serves content to the specified wallet address(es)
    *
-   * @param addressOrAddresses - Single wallet address or array of wallet addresses
+   * @param addressOrAddresses - Single wallet address, array of wallet addresses. Also accepts an empty array, or undefined if relying solely on SDK memory
    * @param options - Configuration options containing imageFormat and optional adUnitId
    * @param options.imageFormat - The desired image format for the ad
    * @param options.adUnitId - arbitrary string id to identify where the ad is being displayed
    * @throws {ValidationError} When wallet address format is invalid
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
-  public async serve(addressOrAddresses: Address | Address[], options: ServeOptions): Promise<SpecifyAd | null> {
-    const addresses = Array.isArray(addressOrAddresses) ? addressOrAddresses : [addressOrAddresses];
+  public async serve(
+    addressOrAddresses: Address | Address[] | undefined,
+    options: ServeOptions,
+  ): Promise<SpecifyAd | null> {
+    const providedAddresses: Address[] = Array.isArray(addressOrAddresses)
+      ? addressOrAddresses
+      : addressOrAddresses
+        ? [addressOrAddresses]
+        : [];
+
+    let allAddressesToServe: Address[];
+    let storedAddresses: Address[] = []; // Initialize here
+
+    if (isClient && this.memorizeWalletsAcrossRequests) {
+      storedAddresses = (await getStoredWalletAddresses()) || [];
+      // Merge provided addresses with stored addresses
+      allAddressesToServe = [...new Set([...providedAddresses, ...storedAddresses])];
+
+      // Cap the addresses at 50 before storing to prevent continuous failures
+      const addressesToStore = allAddressesToServe.slice(0, 50);
+
+      // Update stored addresses for future calls
+      await setStoredWalletAddresses(addressesToStore);
+    } else {
+      allAddressesToServe = providedAddresses;
+    }
 
     // Validate all addresses
-    if (!this.validateAddresses(addresses)) {
+    if (!this.validateAddresses(allAddressesToServe)) {
       throw new ValidationError("Invalid wallet address format");
     }
 
     // Deduplicate addresses
-    const uniqueAddresses = [...new Set(addresses)];
+    const uniqueAddresses = [...new Set(allAddressesToServe)];
 
     // Check limits
     if (uniqueAddresses.length === 0) {
