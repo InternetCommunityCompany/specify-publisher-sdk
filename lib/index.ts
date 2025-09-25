@@ -18,20 +18,22 @@ interface ServeOptions {
 export default class Specify {
   // Publisher key used for authentication
   private readonly publisherKey: string;
-  private readonly memorizeWalletsAcrossRequests: boolean;
+  private readonly cacheAddressesInLocalSession: boolean;
 
   /**
    * Creates a new Specify client instance
    *
-   * @param config - Configuration object containing publisherKey
-   * @throws {AuthenticationError} When publisher key format is invalid
+   * @param config - SDK configuration object
+   * @param config.publisherKey - Publisher key used for authentication
+   * @param config.cacheAddressesInLocalSession - Whether to cache wallet addresses across requests in the browser's local session. Only available in browser environments. Defaults to false.
+   * @throws {ValidationError} When publisher key format is invalid
    */
   constructor(config: SpecifyInitConfig) {
     if (!this.validatePublisherKey(config.publisherKey)) {
-      throw new AuthenticationError("Invalid API key format");
+      throw new ValidationError("Invalid publisher key format");
     }
     this.publisherKey = config.publisherKey;
-    this.memorizeWalletsAcrossRequests = config.memorizeWalletsAcrossRequests ?? true;
+    this.cacheAddressesInLocalSession = config.cacheAddressesInLocalSession ?? false;
   }
 
   /**
@@ -88,7 +90,7 @@ export default class Specify {
     let allAddressesToServe: Address[];
     let storedAddresses: Address[] = []; // Initialize here
 
-    if (isClient && this.memorizeWalletsAcrossRequests) {
+    if (isClient && this.cacheAddressesInLocalSession) {
       storedAddresses = (await getStoredWalletAddresses()) || [];
       // Merge provided addresses with stored addresses
       allAddressesToServe = [...new Set([...providedAddresses, ...storedAddresses])];

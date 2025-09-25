@@ -40,9 +40,10 @@ yarn add @specify-sh/sdk
 ```js
 import Specify, { AuthenticationError, ValidationError, NotFoundError, APIError, ImageFormat } from "@specify-sh/sdk";
 
-// Initialize with your publisher key and enable wallet memory (true by default)
+// Initialize with your publisher key and enable wallet caching
 const specify = new Specify({
   publisherKey: "your_publisher_key",
+  cacheAddressesInLocalSession: true // Do not enable this in server environments
 });
 
 // Serve content based on wallet address
@@ -50,11 +51,11 @@ async function serveContent() {
   try {
     const walletAddress = "0x1234567890123456789012345678901234567890";
 
-    // Serve content with a provided wallet address + SDK memory.
-    const content = await specify.serve([walletAddress], {imageFormat: ImageFormat.LANDSCAPE, adUnitId: "header-banner-1"});
+    // Serve content with a provided wallet address. (And cached addresses as well if cacheAddressesInLocalSession is enabled.)
+    const content = await specify.serve(walletAddress, {imageFormat: ImageFormat.LANDSCAPE, adUnitId: "header-banner-1"});
 
-    // Serve content solely relying on SDK memory for wallets.
-    const contentFromMemory = await specify.serve(undefined, {imageFormat: ImageFormat.SQUARE, adUnitId: "sidebar-ad-1"});
+    // Or; serve content solely relying on the addresses cache (Only works if you have cacheAddressesInLocalSession enabled.)
+    const content = await specify.serve(undefined, {imageFormat: ImageFormat.SQUARE, adUnitId: "sidebar-ad-1"});
   } catch (error) {
     if (error instanceof AuthenticationError) {
       // Handle authentication errors
@@ -75,10 +76,12 @@ serveContent();
 
 ## Advanced Usage
 
-### Serving content to multiple addresses
+### Serving content matching across ads multiple addresses
+
+You can provide a list of wallet addresses and we will find the best ad across all of them. This is useful if your users have multiple wallets connected at a given time for example.
 
 ```js
-// Serve content to multiple wallet addresses (max 50). The SDK will remember these by default.
+// Serve content matching across multiple wallet addresses (max 50).
 const addresses = [
   "0x1234567890123456789012345678901234567890",
   "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
@@ -87,9 +90,6 @@ const addresses = [
 
 // Serve content with multiple provided addresses + SDK memory.
 const content = await specify.serve(addresses, {imageFormat: ImageFormat.SQUARE, adUnitId: "ad-unit-2"});
-
-// Serve content solely relying on SDK memory for wallets.
-const contentFromMemoryMultiple = await specify.serve(undefined, {imageFormat: ImageFormat.LONG_BANNER, adUnitId: "ad-unit-3"});
 ```
 
 ## API Reference
@@ -99,18 +99,18 @@ const contentFromMemoryMultiple = await specify.serve(undefined, {imageFormat: I
 Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
-- `config.memorizeWalletsAcrossRequests` - Optional boolean, defaults to `true`. Set to `false` to disable wallet address memory across requests.
+- `config.cacheAddressesInLocalSession` - Optional boolean, defaults to `false`. Set to `true` to enable caching wallet addresses across requests.
 
 ### `specify.serve(addressOrAddresses, {imageFormat, adUnitId})`
 
 Serves content based on the provided wallet address(es).
 
-- `addressOrAddresses` - Optional. Single wallet address, array of wallet addresses (can be empty), or `undefined` if relying solely on SDK memory (max 50 addresses). If `memorizeWalletsAcrossRequests` is `true`, provided addresses will be merged with previously stored addresses.
-  - Format: `0x` followed by 40 hexadecimal characters
-  - Duplicate addresses are automatically removed
+- `addressOrAddresses` - Optional. Single wallet address, array of wallet addresses (max 50), or `undefined` if relying solely on cached addresses. If `memorizeWalletsAcrossRequests` is `true`, provided addresses will be merged with previously stored addresses.
+  - Format: Standard EVM address format: `0x123...`
+  - Automatically deduplicated by the SDK
 - `imageFormat` - Required image format from the `ImageFormat` enum
 - `adUnitId` - Optional arbitrary string identifier to identify where the ad is being displayed
-- Returns: Promise resolving to ad content object (throws `NotFoundError` if no ad is found)
+- Returns: Promise resolving to ad content object (returns `null` if no ad is found)
 
 #### Response Object
 

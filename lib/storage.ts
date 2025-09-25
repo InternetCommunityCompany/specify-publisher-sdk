@@ -15,9 +15,9 @@ function getLocalStorage(): Storage | undefined {
     if (isClient && window.localStorage) {
       return window.localStorage;
     }
-  } catch (e) {
+  } catch {
     // LocalStorage might be disabled in some environments
-    console.warn("localStorage is not available:", e);
+    // continue without it in these cases
   }
   return undefined;
 }
@@ -74,8 +74,7 @@ async function getAddressesFromIndexedDB(): Promise<Address[] | null> {
       };
     });
   } catch (e) {
-    console.warn("Failed to read from IndexedDB, falling back to localStorage:", e);
-    return null; // Fallback will handle this
+    return null; // Failed to read from IndexedDB, return null
   }
 }
 
