@@ -1,5 +1,6 @@
 export interface SpecifyInitConfig {
   publisherKey: string;
+  cacheAddressesInLocalSession?: boolean;
 }
 
 export enum ImageFormat {

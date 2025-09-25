@@ -31,19 +31,19 @@ describe("Specify", () => {
         new Specify({
           publisherKey: "invalid_key",
         });
-      }).toThrow(AuthenticationError);
+      }).toThrow(ValidationError);
 
       expect(() => {
         new Specify({
           publisherKey: "spk_short",
         });
-      }).toThrow(AuthenticationError);
+      }).toThrow(ValidationError);
 
       expect(() => {
         new Specify({
           publisherKey: `spk_${"a".repeat(31)}`, // Too long
         });
-      }).toThrow(AuthenticationError);
+      }).toThrow(ValidationError);
     });
   });
 
