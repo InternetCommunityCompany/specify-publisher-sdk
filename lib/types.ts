@@ -1,6 +1,6 @@
 export interface SpecifyInitConfig {
   publisherKey: string;
-  cacheAddressesInLocalSession?: boolean;
+  cacheMostRecentAddress?: boolean;
 }
 
 export enum ImageFormat {

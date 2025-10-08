@@ -1,13 +1,18 @@
 import { APIError, AuthenticationError, NotFoundError, ValidationError } from "./error";
-import { getStoredWalletAddresses, setStoredWalletAddresses } from "./storage";
+import { getLocalId, removeLocalId, setLocalId } from "./storage";
 import type { APIErrorResponse, Address, ImageFormat, SpecifyAd, SpecifyInitConfig } from "./types";
-import { isClient } from "./utils";
 
 const API_BASE_URL = "https://app.specify.sh/api";
+
+const WALLET_CACHE_VOID = "WALLET_CACHE_VOID";
 
 interface ServeOptions {
   imageFormat: ImageFormat;
   adUnitId?: string;
+}
+
+interface ServeResponse extends SpecifyAd {
+  localId: string;
 }
 
 /**
@@ -18,14 +23,15 @@ interface ServeOptions {
 export default class Specify {
   // Publisher key used for authentication
   private readonly publisherKey: string;
-  private readonly cacheAddressesInLocalSession: boolean;
+
+  private readonly cacheMostRecentAddress: boolean;
 
   /**
    * Creates a new Specify client instance
    *
    * @param config - SDK configuration object
    * @param config.publisherKey - Publisher key used for authentication
-   * @param config.cacheAddressesInLocalSession - Whether to cache wallet addresses across requests in the browser's local session. Only available in browser environments. Defaults to false.
+   * @param config.cacheMostRecentAddress - Whether to cache wallet addresses across requests in the browser's local session. Only available in browser environments. Defaults to false.
    * @throws {ValidationError} When publisher key format is invalid
    */
   constructor(config: SpecifyInitConfig) {
@@ -33,7 +39,7 @@ export default class Specify {
       throw new ValidationError("Invalid publisher key format");
     }
     this.publisherKey = config.publisherKey;
-    this.cacheAddressesInLocalSession = config.cacheAddressesInLocalSession ?? false;
+    this.cacheMostRecentAddress = config.cacheMostRecentAddress ?? false;
   }
 
   /**
@@ -87,34 +93,23 @@ export default class Specify {
         ? [addressOrAddresses]
         : [];
 
-    let allAddressesToServe: Address[];
-    let storedAddresses: Address[] = []; // Initialize here
-
-    if (isClient && this.cacheAddressesInLocalSession) {
-      storedAddresses = (await getStoredWalletAddresses()) || [];
-      // Merge provided addresses with stored addresses
-      allAddressesToServe = [...new Set([...providedAddresses, ...storedAddresses])];
-
-      // Cap the addresses at 50 before storing to prevent continuous failures
-      const addressesToStore = allAddressesToServe.slice(0, 50);
-
-      // Update stored addresses for future calls
-      await setStoredWalletAddresses(addressesToStore);
-    } else {
-      allAddressesToServe = providedAddresses;
-    }
-
     // Validate all addresses
-    if (!this.validateAddresses(allAddressesToServe)) {
+    if (!this.validateAddresses(providedAddresses)) {
       throw new ValidationError("Invalid wallet address format");
     }
 
     // Deduplicate addresses
-    const uniqueAddresses = [...new Set(allAddressesToServe)];
+    const uniqueAddresses = [...new Set(providedAddresses)];
+
+    let localId = null;
+
+    if (this.cacheMostRecentAddress) {
+      localId = getLocalId();
+    }
 
     // Check limits
-    if (uniqueAddresses.length === 0) {
-      throw new ValidationError("At least one wallet address is required");
+    if (uniqueAddresses.length === 0 && !localId) {
+      return null;
     }
 
     if (uniqueAddresses.length > 50) {
@@ -133,11 +128,16 @@ export default class Specify {
           walletAddresses: uniqueAddresses,
           imageFormat: options.imageFormat,
           adUnitId: options.adUnitId,
+          localId,
         }),
       });
 
       if (!response.ok) {
         if (response.status === 404) {
+          const errorData: ServeResponse = await response.json();
+          if (errorData.localId === WALLET_CACHE_VOID) {
+            removeLocalId();
+          }
           return null;
         }
 
@@ -153,8 +153,16 @@ export default class Specify {
         throw new APIError(`HTTP error! status: ${response.status}`, response.status);
       }
 
-      const data = await response.json();
-      return data as SpecifyAd;
+      const data: ServeResponse = await response.json();
+
+      // Store the localId returned by the API
+      if (this.cacheMostRecentAddress && data.localId && data.localId !== WALLET_CACHE_VOID) {
+        setLocalId(data.localId);
+      }
+
+      // Ensure the returned data conforms to SpecifyAd, excluding the localId for the public interface
+      const { localId: returnedLocalId, ...adData } = data;
+      return adData as SpecifyAd;
     } catch (error) {
       // If it's already one of our custom errors, just rethrow it
       if (
