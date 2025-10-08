@@ -5,7 +5,6 @@ export interface SpecifyInitConfig {
 
 export enum ImageFormat {
   LANDSCAPE = "LANDSCAPE",
-  SQUARE = "SQUARE",
   LONG_BANNER = "LONG_BANNER",
   SHORT_BANNER = "SHORT_BANNER",
   NO_IMAGE = "NO_IMAGE",

@@ -55,7 +55,7 @@ async function serveContent() {
     const content = await specify.serve(walletAddress, {imageFormat: ImageFormat.LANDSCAPE, adUnitId: "header-banner-1"});
 
     // Or; serve content solely relying on the addresses cache (Only works if you have cacheAddressesInLocalSession enabled.)
-    const content = await specify.serve(undefined, {imageFormat: ImageFormat.SQUARE, adUnitId: "sidebar-ad-1"});
+    const content = await specify.serve(undefined, {imageFormat: ImageFormat.SHORT_BANNER, adUnitId: "sidebar-ad-1"});
   } catch (error) {
     if (error instanceof AuthenticationError) {
       // Handle authentication errors
@@ -89,7 +89,7 @@ const addresses = [
 ];
 
 // Serve content with multiple provided addresses + SDK memory.
-const content = await specify.serve(addresses, {imageFormat: ImageFormat.SQUARE, adUnitId: "ad-unit-2"});
+const content = await specify.serve(addresses, {imageFormat: ImageFormat.LONG_BANNER, adUnitId: "ad-unit-2"});
 ```
 
 ## API Reference
@@ -126,7 +126,7 @@ interface SpecifyAd {
   imageUrl: string;
   communityName: string;
   communityLogo: string;
-  imageFormat: "LANDSCAPE" | "SQUARE" | "LONG_BANNER" | "SHORT_BANNER" | "NO_IMAGE";  
+  imageFormat: "LANDSCAPE" | "LONG_BANNER" | "SHORT_BANNER" | "NO_IMAGE";  
   adUnitId?: string;
 }
 ```
@@ -136,7 +136,6 @@ interface SpecifyAd {
 The `ImageFormat` enum defines the available image format options:
 
 - `ImageFormat.LANDSCAPE` - 16:9 - Landscape-oriented images
-- `ImageFormat.SQUARE` - 1:1 - Square images
 - `ImageFormat.LONG_BANNER` - 8:1 - Long banner format
 - `ImageFormat.SHORT_BANNER` - 16:5 - Short banner format
 - `ImageFormat.NO_IMAGE` - No image, text-only ads
