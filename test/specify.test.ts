@@ -254,20 +254,20 @@ describe("Specify", () => {
         walletAddress: VALID_MOCK_WALLET_ADDRESS,
         campaignId: "abcd1234567",
         adId: "A",
-        headline: "Test Ad with Square Format",
-        content: "Test content for square image",
-        imageId: "square123",
+        headline: "Test Ad with Long Banner Format",
+        content: "Test content for long banner image",
+        imageId: "long_banner123",
         ctaUrl: "https://example.com",
         ctaLabel: "Click Here",
       };
 
       setupMockFetch<MockSpecifyAd>(mockResponse);
 
-      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.SQUARE });
+      const content = await specify.serve(VALID_MOCK_WALLET_ADDRESS, { imageFormat: ImageFormat.LONG_BANNER });
 
       expect(content).toBeDefined();
       expect(content).toHaveProperty("walletAddress", VALID_MOCK_WALLET_ADDRESS);
-      expect(content).toHaveProperty("headline", "Test Ad with Square Format");
+      expect(content).toHaveProperty("headline", "Test Ad with Long Banner Format");
     });
 
     it("should work with different image formats", async () => {
@@ -278,7 +278,6 @@ describe("Specify", () => {
       // Test each image format
       const imageFormats = [
         ImageFormat.LANDSCAPE,
-        ImageFormat.SQUARE,
         ImageFormat.LONG_BANNER,
         ImageFormat.SHORT_BANNER,
         ImageFormat.NO_IMAGE,
