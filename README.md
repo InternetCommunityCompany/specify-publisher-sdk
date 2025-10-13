@@ -43,7 +43,7 @@ import Specify, { AuthenticationError, ValidationError, NotFoundError, APIError,
 // Initialize with your publisher key and enable wallet caching
 const specify = new Specify({
   publisherKey: "your_publisher_key",
-  cacheAddressesInLocalSession: true // Do not enable this in server environments
+  cacheMostRecentAddress: true // Do not enable this in server environments
 });
 
 // Serve content based on wallet address
@@ -51,7 +51,7 @@ async function serveContent() {
   try {
     const walletAddress = "0x1234567890123456789012345678901234567890";
 
-    // Serve content with a provided wallet address. (And cached addresses as well if cacheAddressesInLocalSession is enabled.)
+    // Serve content with a provided wallet address. The SDK will also use the wallet cache if available.
     const content = await specify.serve(walletAddress, {imageFormat: ImageFormat.LANDSCAPE, adUnitId: "header-banner-1"});
 
     // Or; serve content solely relying on the addresses cache (Only works if you have cacheAddressesInLocalSession enabled.)
@@ -99,13 +99,13 @@ const content = await specify.serve(addresses, {imageFormat: ImageFormat.LONG_BA
 Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
-- `config.cacheAddressesInLocalSession` - Optional boolean, defaults to `false`. Set to `true` to enable caching wallet addresses across requests.
+- `config.cacheMostRecentAddress` - Optional boolean, defaults to `false`. Set to `true` to enable caching the most recent wallet data across requests in supported environments (e.g., browser `localStorage`).
 
 ### `specify.serve(addressOrAddresses, {imageFormat, adUnitId})`
 
 Serves content based on the provided wallet address(es).
 
-- `addressOrAddresses` - Optional. Single wallet address, array of wallet addresses (max 50), or `undefined` if relying solely on cached addresses. If `memorizeWalletsAcrossRequests` is `true`, provided addresses will be merged with previously stored addresses.
+- `addressOrAddresses` - Optional. Single wallet address, array of wallet addresses (max 50), or `undefined` if relying solely on the cached wallet data. If `cacheMostRecentAddress` is `true`, the SDK will attempt to use the cached wallet data if available, either independently or in conjunction with provided addresses.
   - Format: Standard EVM address format: `0x123...`
   - Automatically deduplicated by the SDK
 - `imageFormat` - Required image format from the `ImageFormat` enum

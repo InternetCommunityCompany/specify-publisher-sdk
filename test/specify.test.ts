@@ -157,12 +157,12 @@ describe("Specify", () => {
       );
     });
 
-    it("should throw ValidationError for empty address array", async () => {
+    it("should return null for empty address array when no localId is present", async () => {
       const specify = new Specify({
         publisherKey: VALID_MOCK_PUBLISHER_KEY,
       });
 
-      await expect(specify.serve([], { imageFormat: ImageFormat.LANDSCAPE })).rejects.toThrow(ValidationError);
+      await expect(specify.serve([], { imageFormat: ImageFormat.LANDSCAPE })).resolves.toBeNull();
     });
 
     it("should throw ValidationError for too many addresses", async () => {
