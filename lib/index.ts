@@ -84,7 +84,7 @@ export default class Specify {
    * @returns Ad content for the specified wallet address or null if the ad is not found
    */
   public async serve(
-    addressOrAddresses: Address | Address[] | undefined,
+    addressOrAddresses: Address | Address[] | undefined | null,
     options: ServeOptions,
   ): Promise<SpecifyAd | null> {
     const providedAddresses: Address[] = Array.isArray(addressOrAddresses)
