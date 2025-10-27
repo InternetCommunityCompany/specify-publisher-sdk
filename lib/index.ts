@@ -137,6 +137,8 @@ export default class Specify {
           const errorData: ServeResponse = await response.json();
           if (errorData.localId === WALLET_CACHE_VOID) {
             removeLocalId();
+          } else if (errorData.localId) {
+            setLocalId(errorData.localId);
           }
           return null;
         }
