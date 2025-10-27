@@ -136,7 +136,7 @@ interface SpecifyAd {
 The `ImageFormat` enum defines the available image format options:
 
 - `ImageFormat.LANDSCAPE` - 16:9 - Landscape-oriented images
-- `ImageFormat.LONG_BANNER` - 8:1 - Long banner format
+- `ImageFormat.LONG_BANNER` - 8.09:1 - Long banner format
 - `ImageFormat.SHORT_BANNER` - 16:5 - Short banner format
 - `ImageFormat.NO_IMAGE` - No image, text-only ads
 
