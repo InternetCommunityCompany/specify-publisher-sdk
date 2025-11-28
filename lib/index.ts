@@ -74,6 +74,24 @@ export default class Specify {
   }
 
   /**
+   * Resolve the request referrer from browser context (if available)
+   */
+  private getReferrer(): string | undefined {
+    if (typeof window !== "undefined" && typeof window.location?.href === "string") {
+      return window.location.href;
+    }
+
+    if (typeof document !== "undefined") {
+      const referrer = document.referrer?.trim();
+      if (referrer) {
+        return referrer;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
    * Serves content to the specified wallet address(es)
    *
    * @param addressOrAddresses - Single wallet address, array of wallet addresses. Also accepts an empty array, or undefined if relying solely on SDK memory
@@ -116,6 +134,8 @@ export default class Specify {
       throw new ValidationError("Maximum 50 wallet addresses allowed");
     }
 
+    const referrer = this.getReferrer();
+
     let response: Response;
     try {
       response = await fetch(`${API_BASE_URL}/ads`, {
@@ -129,6 +149,7 @@ export default class Specify {
           imageFormat: options.imageFormat,
           adUnitId: options.adUnitId,
           localId,
+          referrer,
         }),
       });
 
