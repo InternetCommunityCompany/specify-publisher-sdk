@@ -4,7 +4,7 @@ const LOCAL_ID_KEY = "__specify_local_id";
 
 function getLocalStorage(): Storage | undefined {
   try {
-    if (isClient && window.localStorage) {
+    if (isClient() && window.localStorage) {
       return window.localStorage;
     }
   } catch {

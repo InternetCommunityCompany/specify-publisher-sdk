@@ -92,6 +92,51 @@ const addresses = [
 const content = await specify.serve(addresses, {imageFormat: ImageFormat.LONG_BANNER, adUnitId: "ad-unit-2"});
 ```
 
+## Identity layer (v0.5+)
+
+From v0.5 the SDK includes an optional identity layer that lets ad requests be
+resolved against the Specify network identity graph, so wallet-targeted ads can
+be served even to sessions that haven't passed a wallet explicitly.
+
+Two things happen automatically in the browser:
+
+1. **Passive wallet detection.** On init the SDK discovers injected wallets via
+   [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) (with a legacy
+   `window.ethereum` fallback) and makes a **silent** `eth_accounts` read. It
+   **never** prompts the user or calls `eth_requestAccounts`. Detected addresses
+   are merged into subsequent `serve()` calls. Turn this off with
+   `privacy.disableWalletDetection: true`.
+2. **Credentialed ad requests.** Each `serve()` is sent with credentials, so the
+   server-only cross-site identifier cookie rides along and is set/refreshed on
+   the ad response itself — no separate sync ping is needed on publisher pages.
+   The cookie is `HttpOnly` and **server-set only** — the SDK never reads or
+   handles its value, and it never appears in client code, logs, or the DOM. In
+   browsers that block third-party cookies (Safari, Firefox, Brave) nothing is
+   persisted and the SDK degrades gracefully to wallet-/click-only behaviour.
+
+```js
+const specify = new Specify({
+  publisherKey: "spk_...",
+  environment: "production",          // default
+  privacy: { disableWalletDetection: false }, // default
+});
+
+// In the browser, serve() always fires — even with no wallet — so the ad server
+// can resolve one from the identity cookie:
+const ad = await specify.serve(undefined, { imageFormat: ImageFormat.LANDSCAPE });
+
+// WalletConnect and other remote wallets don't inject a provider. There is no
+// setWalletAddresses() here on purpose: just pass the address your dApp already
+// holds straight to serve() — that targets the ad *and* seeds the graph:
+await specify.serve("0xabc...", { imageFormat: ImageFormat.LANDSCAPE });
+
+// Inspect what passive detection currently sees:
+specify.getDetectedWallets();
+
+// Release listeners when tearing down a view (SPA):
+specify.destroy();
+```
+
 ## API Reference
 
 ### `new Specify(config)`
@@ -100,6 +145,17 @@ Creates a new instance of the Specify client.
 
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 - `config.cacheMostRecentAddress` - Optional boolean, defaults to `false`. Set to `true` to enable caching the most recent wallet data across requests in supported environments (e.g., browser `localStorage`).
+- `config.environment` - Optional `"production"` (default) or `"staging"`. Selects the identity edge endpoints.
+- `config.privacy.disableWalletDetection` - Optional boolean, defaults to `false`. Set to `true` to disable automatic passive wallet detection. `setWalletAddresses()` still works.
+- `config.edge` - Optional advanced overrides for the identity edge (`baseUrl`, or per-endpoint `endpoints`). Most integrators never need this.
+
+### `specify.getDetectedWallets()`
+
+Returns the wallet addresses currently seen by passive detection (lowercase hex). For wallets detection can't see (e.g. WalletConnect), pass the address directly to `serve()` — there is no `setWalletAddresses()` on the publisher SDK by design.
+
+### `specify.destroy()`
+
+Stops wallet detection and flushes/detaches the event transport. Call when tearing down a client in a single-page app.
 
 ### `specify.serve(addressOrAddresses, {imageFormat, adUnitId})`
 
@@ -150,6 +206,31 @@ The `ImageFormat` enum defines the available image format options:
 - `ValidationError` - Invalid wallet address format, or too many addresses (>50)
 - `NotFoundError` - No ad found for the provided address(es)
 - `APIError` - Network errors or other HTTP errors
+
+---
+
+## Privacy & consent
+
+The identity layer collects, on publisher properties: page URL and referrer, a
+first-party session id, detected/provided wallet addresses, and (server-side) a
+cross-site identifier cookie plus IP/user-agent for fraud filtering. Wallet
+addresses are treated as personal data under GDPR.
+
+**Consent is the integrator's responsibility.** Publishers must obtain any
+consents required under applicable law (GDPR/ePrivacy, CCPA, etc.) before
+loading the SDK, and should gate the SDK behind their consent management
+platform where required:
+
+```js
+cmp.onConsent(["analytics", "advertising"], () => {
+  const specify = new Specify({ publisherKey: "spk_..." });
+  // ...render ads
+});
+```
+
+To run without automatic wallet detection, set
+`privacy.disableWalletDetection: true`. See the enhanced-targeting spec (§9) for
+retention periods and the full disclosure model.
 
 ---
 
