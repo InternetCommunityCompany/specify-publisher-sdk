@@ -3,7 +3,7 @@ import type { EndpointOverrides, Environment } from "./core/config";
 export interface PrivacyConfig {
   /**
    * Disable the automatic, passive EIP-6963/1193 wallet detection layer.
-   * Explicit `setWalletAddresses()` still works when this is true.
+   * Addresses passed explicitly to `serve()` still work when this is true.
    * @default false
    */
   disableWalletDetection?: boolean;

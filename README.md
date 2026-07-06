@@ -146,7 +146,7 @@ Creates a new instance of the Specify client.
 - `config.publisherKey` - Your publisher API key (required, format: `spk_` followed by 30 alphanumeric characters)
 - `config.cacheMostRecentAddress` - Optional boolean, defaults to `false`. Set to `true` to enable caching the most recent wallet data across requests in supported environments (e.g., browser `localStorage`).
 - `config.environment` - Optional `"production"` (default) or `"staging"`. Selects the identity edge endpoints.
-- `config.privacy.disableWalletDetection` - Optional boolean, defaults to `false`. Set to `true` to disable automatic passive wallet detection. `setWalletAddresses()` still works.
+- `config.privacy.disableWalletDetection` - Optional boolean, defaults to `false`. Set to `true` to disable automatic passive wallet detection. Addresses passed explicitly to `serve()` still work.
 - `config.edge` - Optional advanced overrides for the identity edge (`baseUrl`, or per-endpoint `endpoints`). Most integrators never need this.
 
 ### `specify.getDetectedWallets()`

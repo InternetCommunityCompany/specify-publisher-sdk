@@ -13,7 +13,7 @@ import { isClient } from "../utils";
  * - Normalises addresses to lowercase hex before exposing them.
  *
  * Known gap: WalletConnect v2 sessions do not inject a provider, so remote
- * wallets are invisible here — integrators pass those via `setWalletAddresses`.
+ * wallets are invisible here — integrators pass those straight to `serve()`.
  */
 
 type Address = string;
@@ -156,7 +156,7 @@ export class WalletDetector {
   }
 }
 
-/** Validate and normalise externally-supplied addresses (setWalletAddresses). */
+/** Validate and normalise externally-supplied addresses. */
 export function normalizeAddresses(addresses: readonly string[]): Address[] {
   const out = new Set<Address>();
   for (const address of addresses) {

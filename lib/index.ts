@@ -150,6 +150,8 @@ export default class Specify {
     if (!transport) {
       return;
     }
+    // The ingest endpoint rejects any event whose page fields exceed 2048
+    // chars — and one oversized event voids the whole batch — so truncate here.
     transport.enqueue({
       name: "wallet_detected",
       ts: new Date().toISOString(),
@@ -157,8 +159,8 @@ export default class Specify {
       spclid: null,
       wallets,
       page: {
-        url: isClient() ? window.location.href : "",
-        referrer: isClient() ? document.referrer : "",
+        url: window.location.href.slice(0, 2048),
+        referrer: document.referrer.slice(0, 2048),
       },
       props: {},
     });
@@ -194,18 +196,20 @@ export default class Specify {
       throw new ValidationError("Invalid wallet address format");
     }
 
+    if (providedAddresses.length > 50) {
+      throw new ValidationError("Maximum 50 wallet addresses allowed");
+    }
+
     // Merge caller-provided addresses with passively detected wallets, then
-    // deduplicate. Detected wallets are already validated.
-    const uniqueAddresses = [...new Set<Address>([...providedAddresses, ...this.getDetectedWallets()])];
+    // deduplicate. Detected wallets are already validated. Provided addresses
+    // come first so, if detection pushes the set past the server's 50-address
+    // limit, detected extras are dropped rather than the call throwing.
+    const uniqueAddresses = [...new Set<Address>([...providedAddresses, ...this.getDetectedWallets()])].slice(0, 50);
 
     let localId = null;
 
     if (this.cacheMostRecentAddress) {
       localId = getLocalId();
-    }
-
-    if (uniqueAddresses.length > 50) {
-      throw new ValidationError("Maximum 50 wallet addresses allowed");
     }
 
     // Outside the browser there is no `spid` cookie to resolve, so with no

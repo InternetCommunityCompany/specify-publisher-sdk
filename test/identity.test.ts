@@ -1,9 +1,14 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import Specify, { ImageFormat } from "../lib";
 import { resolveEndpoints } from "../lib/core/config";
 import { uuidv7 } from "../lib/core/uuid";
 import { normalizeAddresses } from "../lib/core/wallet";
 import { VALID_MOCK_PUBLISHER_KEY, VALID_MOCK_WALLET_ADDRESS } from "./consts";
+
+const originalFetch = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
 
 describe("core/uuid", () => {
   it("emits a v7-shaped UUID", () => {
