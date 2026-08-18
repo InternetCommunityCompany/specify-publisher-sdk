@@ -8,7 +8,7 @@
  */
 
 import { readFile, readdir, stat } from "node:fs/promises";
-import { extname, join, relative } from "node:path";
+import { basename, extname, join, relative } from "node:path";
 import { PRODUCTS, type ProductId } from "./products";
 
 /** Directories never worth walking. */
@@ -202,7 +202,9 @@ export async function verifyIntegration(dir: string, product: ProductId): Promis
 
     const rel = relative(dir, file) || file;
 
-    if (rel === "package.json" && contents.includes(`"${packageName}"`)) {
+    // Any package.json in the tree counts: in a workspace monorepo the
+    // dependency lands in the package that uses it, not at the root.
+    if (basename(rel) === "package.json" && contents.includes(`"${packageName}"`)) {
       dependencyDeclared = true;
     }
 

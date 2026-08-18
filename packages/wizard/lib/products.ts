@@ -89,14 +89,17 @@ export function isProductId(value: string): value is ProductId {
  * @returns A single shell command
  */
 export function installCommand(manager: PackageManager, packageName: string): string {
+  // Pinned to major 1: older published majors have a different, smaller API,
+  // and an unpinned install would resolve to whatever is newest on npm.
+  const pinned = `${packageName}@^1`;
   switch (manager) {
     case "bun":
-      return `bun add ${packageName}`;
+      return `bun add ${pinned}`;
     case "pnpm":
-      return `pnpm add ${packageName}`;
+      return `pnpm add ${pinned}`;
     case "yarn":
-      return `yarn add ${packageName}`;
+      return `yarn add ${pinned}`;
     default:
-      return `npm install ${packageName}`;
+      return `npm install ${pinned}`;
   }
 }

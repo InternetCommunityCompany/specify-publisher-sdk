@@ -41,6 +41,20 @@ describe("verifyIntegration — publisher", () => {
     }
   });
 
+  it("finds the dependency declared in a workspace package, not only at the root", async () => {
+    // Live-run finding on the CoW Swap monorepo: the agent correctly added the
+    // dependency to libs/analytics/package.json and the root-only check
+    // reported it missing.
+    await write("package.json", JSON.stringify({ name: "monorepo", workspaces: ["libs/*"] }));
+    await write(
+      "libs/analytics/package.json",
+      JSON.stringify({ dependencies: { "@specify-sh/sdk": "1.0.0" }, name: "@repo/analytics" }),
+    );
+
+    const result = await verifyIntegration(root, "publisher");
+    expect(result.dependencyDeclared).toBe(true);
+  });
+
   it("accepts a GTM loader integration as equally valid", async () => {
     await write("package.json", JSON.stringify({ name: "site" }));
     await write(
