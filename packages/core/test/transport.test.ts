@@ -35,7 +35,7 @@ function makeEvent(name: string): SpecifyEvent {
   };
 }
 
-const ENDPOINT = "https://spfsrv.com/api/events";
+const ENDPOINT = "https://spfsrv.com/v1/events";
 
 function newTransport(overrides: Partial<ConstructorParameters<typeof EventTransport>[0]> = {}): EventTransport {
   return new EventTransport({
@@ -98,6 +98,42 @@ describe("EventTransport", () => {
     expect(bodyOf(0).property_id).toBe("spk_test");
     expect(bodyOf(0).sdk.name).toBe("publisher");
     transport.destroy();
+  });
+
+  it("merges caller headers with the JSON content type", () => {
+    const transport = newTransport({ headers: { "x-api-key": "adv_test" }, maxBatchSize: 1 });
+
+    transport.enqueue(makeEvent("one"));
+
+    expect(requests[0].init?.headers).toEqual({
+      "Content-Type": "application/json",
+      "x-api-key": "adv_test",
+    });
+    transport.destroy();
+  });
+
+  it("never lets a caller header override the content type", () => {
+    const transport = newTransport({ headers: { "Content-Type": "text/plain" }, maxBatchSize: 1 });
+
+    transport.enqueue(makeEvent("one"));
+
+    expect((requests[0].init?.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    transport.destroy();
+  });
+
+  it("drops the buffer without sending on discard", async () => {
+    const transport = newTransport({ maxBatchSize: 100, maxBatchAgeMs: 20 });
+    transport.enqueue(makeEvent("one"));
+
+    transport.discard();
+
+    expect(requests).toHaveLength(0);
+    // The pending age timer is cancelled too, so nothing arrives later.
+    await flush(40);
+    expect(requests).toHaveLength(0);
+
+    transport.destroy();
+    expect(requests).toHaveLength(0);
   });
 
   it("starts a fresh batch after a flush", () => {

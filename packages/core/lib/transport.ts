@@ -10,11 +10,11 @@ import { isClient } from "./env";
  *   modern `sendBeacon` equivalent that still lets us send credentials + JSON).
  *
  * The `spid` cookie rides along on every request via `credentials: 'include'`;
- * it never appears in the payload.
+ * it never appears in the payload. Callers only ever hand events over once the
+ * user has consented, so the flag is unconditional here.
  *
- * Not used by the Publisher SDK — event ingest belongs to the Advertiser SDK,
- * which moves into this monorepo next. It lives here so both packages share one
- * implementation.
+ * Not used by the Publisher SDK — event ingest belongs to the Advertiser SDK.
+ * It lives here so both packages share one implementation.
  */
 
 export interface SpecifyEvent {
@@ -33,6 +33,11 @@ export interface TransportOptions {
   sdk: { name: string; version: string };
   maxBatchSize?: number;
   maxBatchAgeMs?: number;
+  /**
+   * Extra request headers, e.g. the caller's API key. `Content-Type` is always
+   * set by the transport and cannot be overridden.
+   */
+  headers?: Record<string, string>;
 }
 
 export class EventTransport {
@@ -41,6 +46,7 @@ export class EventTransport {
   private readonly sdk: { name: string; version: string };
   private readonly maxBatchSize: number;
   private readonly maxBatchAgeMs: number;
+  private readonly headers: Record<string, string>;
 
   private queue: SpecifyEvent[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -53,6 +59,7 @@ export class EventTransport {
     this.sdk = options.sdk;
     this.maxBatchSize = options.maxBatchSize ?? 10;
     this.maxBatchAgeMs = options.maxBatchAgeMs ?? 5000;
+    this.headers = { ...options.headers, "Content-Type": "application/json" };
     this.bindLifecycle();
   }
 
@@ -96,7 +103,7 @@ export class EventTransport {
         method: "POST",
         credentials: "include",
         keepalive: true,
-        headers: { "Content-Type": "application/json" },
+        headers: this.headers,
         body,
       }).catch(() => {
         // Ingest failures are non-fatal; events are best-effort analytics.
@@ -104,6 +111,20 @@ export class EventTransport {
     } catch {
       // fetch can throw synchronously if the payload exceeds keepalive limits.
     }
+  }
+
+  /**
+   * Drop everything currently buffered without sending it.
+   *
+   * Used when consent is withdrawn: events collected a moment ago should not
+   * leave the page just because a batch had not filled up yet.
+   */
+  public discard(): void {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.queue = [];
   }
 
   /** Detach lifecycle listeners; flushes any remaining events first. */

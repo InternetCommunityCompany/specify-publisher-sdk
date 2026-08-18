@@ -338,13 +338,68 @@ The `ImageFormat` enum defines the available image format options:
 
 ---
 
+## Advertiser SDK
+
+`@specify-sh/advertiser` is a separate, optional package for **advertisers**, not publishers. You add it to your own site to see the funnel a Specify campaign produced: who saw the ad, who visited, who converted.
+
+Events are for funnel analytics only. **Specify never bills on them** — billing stays entirely on-chain — so there is no allowlist of "billable" events and nothing you send here affects spend.
+
+```bash
+bun add @specify-sh/advertiser
+```
+
+```js
+import { SpecifyAnalytics } from "@specify-sh/advertiser";
+
+const analytics = new SpecifyAnalytics({ propertyKey: "adv_your_property_key" });
+
+// Call this from your CMP whenever the user has consented, on every page load.
+// Without consent nothing is sent at all; events raised before it are buffered.
+analytics.consentForEnhancedTracking();
+
+// Optional: hand over an address your app already knows.
+analytics.identify("0x1234567890123456789012345678901234567890");
+
+analytics.logEvent("signup_completed", { plan: "pro" });
+```
+
+`page_view` (including SPA route changes), `wallet_detected` and `wallet_changed` are captured automatically. A Specify ad click lands with `?spclid=…`, which is stored for the visit and attached to every event so conversions join back to the click.
+
+| Method | Notes |
+| --- | --- |
+| `new SpecifyAnalytics(config)` | `config.propertyKey` (required, `adv_` + 30 characters), `config.privacy.disableWalletDetection`, `config.edge.baseUrl`. |
+| `consentForEnhancedTracking()` | Starts sending, and flushes anything buffered since page load. Never persisted — your CMP must call it every page load. |
+| `revokeEnhancedTrackingConsent()` | Stops sending and drops everything not yet delivered. |
+| `hasEnhancedTrackingConsent()` | Current consent state. |
+| `identify(addressOrAddresses)` | Attaches wallet addresses to later events. Does not emit an event. |
+| `logEvent(name, props?)` | `name` matches `/^[a-z0-9_]{1,64}$/`; `props` is JSON up to 8KB. |
+| `getDetectedWallets()` | Passively detected addresses. |
+| `destroy()` | Flushes, stops detection and restores the patched history methods. |
+
+For tag-managed sites, the same commands are available through a loader on its own global (`specifyAnalytics`, so it can run alongside the publisher tag's `specify`):
+
+```html
+<script>window.specifyAnalytics=window.specifyAnalytics||function(){(window.specifyAnalytics.q=window.specifyAnalytics.q||[]).push(arguments)};</script>
+<script async src="https://spfsrv.com/sdk/advertiser/v1.js"></script>
+
+<script>
+  specifyAnalytics('init', { propertyKey: 'adv_your_property_key' });
+  specifyAnalytics('consent');
+  specifyAnalytics('event', 'signup_completed', { plan: 'pro' });
+</script>
+```
+
+Commands are `init`, `consent`, `revokeConsent`, `identify` and `event`; anything issued before `init` is buffered and replayed.
+
+---
+
 ## Build from Source
 
 ### Requirements:
 
 - [Bun](https://bun.sh)
 
-This repository is a Bun workspaces monorepo. `packages/sdk` is the published `@specify-sh/sdk` package; `packages/core` is private shared plumbing that is bundled into the SDK's output.
+This repository is a Bun workspaces monorepo. `packages/sdk` is the published `@specify-sh/sdk` package and `packages/advertiser` the published `@specify-sh/advertiser` package; `packages/core` is private shared plumbing that is bundled into both packages' output.
 
 ```bash
 # Clone the repository
@@ -367,7 +422,7 @@ bun run check
 bun run build
 ```
 
-The build produces `packages/sdk/dist/index.js` (ESM), `packages/sdk/dist/index.d.ts`, and `packages/sdk/dist/loader/v1.js` (the self-contained GTM/CDN loader, served at `https://spfsrv.com/sdk/v1.js`).
+The build produces `packages/sdk/dist/index.js` (ESM), `packages/sdk/dist/index.d.ts`, and `packages/sdk/dist/loader/v1.js` (the self-contained GTM/CDN loader, served at `https://spfsrv.com/sdk/v1.js`). The advertiser package builds the same three artefacts under `packages/advertiser/dist`, with its loader served at `https://spfsrv.com/sdk/advertiser/v1.js`.
 
 ## Examples
 

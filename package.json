@@ -6,9 +6,10 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "preinstall": "npx only-allow bun",
-    "build": "bun run build:core && bun run build:sdk",
+    "build": "bun run build:core && bun run build:sdk && bun run build:advertiser",
     "build:core": "bun run --filter '@specify-sh/core' build",
     "build:sdk": "bun run --filter '@specify-sh/sdk' build",
+    "build:advertiser": "bun run --filter '@specify-sh/advertiser' build",
     "test": "bun test",
     "types": "bun run build:core && bun run --filter '*' types",
     "check": "biome check .",

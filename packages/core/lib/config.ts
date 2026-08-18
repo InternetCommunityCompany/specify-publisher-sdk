@@ -6,8 +6,9 @@
  * identity cookie that is stable across every publisher site, so a credentialed
  * ad request can resolve an identity the page itself never saw.
  *
- * The shape is intentionally an endpoint *map* even though only one endpoint
- * exists today: the advertiser SDK will add its own paths on the same base.
+ * The shape is intentionally an endpoint *map*: the publisher SDK serves ads
+ * from one path and the advertiser SDK posts funnel events to another, both on
+ * the same base.
  */
 
 /** Neutral serving domain. Overridable per-instance for local development. */
@@ -24,6 +25,8 @@ export interface EdgeOverrides {
 export interface EndpointConfig {
   /** Ad decisioning endpoint. */
   ads: string;
+  /** Funnel event ingest endpoint. */
+  events: string;
 }
 
 /**
@@ -37,5 +40,6 @@ export function resolveEndpoints(overrides: EdgeOverrides = {}): EndpointConfig 
   const base = baseUrl.replace(/\/+$/, "");
   return {
     ads: `${base}/api/ads`,
+    events: `${base}/v1/events`,
   };
 }
