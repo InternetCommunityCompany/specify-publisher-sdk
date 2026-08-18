@@ -142,6 +142,23 @@ export function isAuthFailure(error: unknown): boolean {
   return /authenticat|oauth|logged out|not logged in|login required|please log in|api key/i.test(message);
 }
 
+/**
+ * Recognise a transient model-provider failure — the kind whose own error text
+ * says "try again in a moment" — among whatever a turn threw.
+ *
+ * Matched from messages real CLIs emit: HTTP 5xx status lines, "overloaded",
+ * "server error", "rate limit". These are worth exactly one immediate retry;
+ * anything that fails twice is treated like any other failure. Auth problems
+ * are checked first by callers and never land here.
+ *
+ * @param error - Whatever a turn rejected with
+ * @returns True when the failure reads as temporary
+ */
+export function isTransientFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /\b5\d\d\b|overloaded|server error|rate limit|try again|temporar/i.test(message);
+}
+
 /** Discovery and construction of coding agents. */
 export interface AgentGateway {
   list: () => Promise<AgentOption[]>;

@@ -8,7 +8,14 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { asSchemaFailure, createAnyAgentGateway, describeEvent, isAuthFailure, toWizardEvent } from "../lib/agent";
+import {
+  asSchemaFailure,
+  createAnyAgentGateway,
+  describeEvent,
+  isAuthFailure,
+  isTransientFailure,
+  toWizardEvent,
+} from "../lib/agent";
 import { fakeAdapter, fakeProbe } from "./fixtures";
 
 /** Drain a run's events and resolve with its result. */
@@ -287,6 +294,27 @@ describe("isAuthFailure", () => {
     expect(isAuthFailure(new Error("ENOENT: no such file"))).toBe(false);
     expect(isAuthFailure({ code: "Parse" })).toBe(false);
     expect(isAuthFailure(null)).toBe(false);
+  });
+});
+
+describe("isTransientFailure", () => {
+  it("recognises the messages real providers emit when briefly down", () => {
+    // Both verbatim from claude-code during live wizard runs, 2026-08-18.
+    expect(
+      isTransientFailure(
+        new Error("claude-code: API Error: 500 Internal server error. This is a server-side issue, usually temporary"),
+      ),
+    ).toBe(true);
+    expect(isTransientFailure(new Error("claude-code: API Error: 529 Overloaded."))).toBe(true);
+    expect(isTransientFailure(new Error("API Error: Server error mid-response."))).toBe(true);
+    expect(isTransientFailure(new Error("rate limit exceeded"))).toBe(true);
+  });
+
+  it("leaves permanent failures alone", () => {
+    expect(isTransientFailure(new Error("the CLI exited 1"))).toBe(false);
+    expect(isTransientFailure(new Error("ENOENT: no such file"))).toBe(false);
+    expect(isTransientFailure(new Error("Failed to authenticate: OAuth session expired"))).toBe(false);
+    expect(isTransientFailure(null)).toBe(false);
   });
 });
 

@@ -16,7 +16,7 @@
  */
 
 import type { AgentGateway, AgentOption, AgentRunner, WizardRun, WizardRunResult, WizardTurnOptions } from "./agent";
-import { asSchemaFailure, describeEvent, isAuthFailure } from "./agent";
+import { asSchemaFailure, describeEvent, isAuthFailure, isTransientFailure } from "./agent";
 import type { WizardArgs } from "./args";
 import { renderManualInstructions } from "./fallback";
 import { type GitStatus, gitDiffStat, gitStatus } from "./git";
@@ -42,14 +42,49 @@ export interface WizardDeps {
   readDiffStat?: (dir: string) => Promise<string | null>;
   /** Repository state, injected so tests need no repo. */
   readGitStatus?: (dir: string) => Promise<GitStatus>;
+  /** Pause between a transient failure and its retry, injected so tests need no clock. */
+  sleep?: (ms: number) => Promise<void>;
   /** Marker scan, injected so tests need no fixture tree. */
   verify?: (dir: string, product: ProductId) => Promise<VerificationResult>;
 }
+
+/** How long to wait before retrying a turn that failed transiently. */
+const TRANSIENT_RETRY_DELAY_MS = 3000;
 
 /** Process exit codes the CLI reports. */
 export const EXIT_OK = 0;
 export const EXIT_FAILED = 1;
 export const EXIT_CANCELLED = 130;
+
+/**
+ * Run one turn, retrying exactly once when the failure is the model provider's
+ * own "temporary, try again" kind (5xx, overloaded, rate limit). Anything else
+ * — including an auth failure, which no retry can fix — is rethrown untouched,
+ * and so is a second transient failure.
+ *
+ * @param io - Where to explain the retry
+ * @param wait - Pause between attempts
+ * @param what - Subject for the retry message, e.g. "The investigation"
+ * @param attempt - Starts the turn; called once more on a transient failure
+ * @returns Whatever the successful attempt resolved with
+ */
+async function onceRetried<T>(
+  io: WizardIo,
+  wait: (ms: number) => Promise<void>,
+  what: string,
+  attempt: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await attempt();
+  } catch (error) {
+    if (isAuthFailure(error) || !isTransientFailure(error)) {
+      throw error;
+    }
+    io.warn(`${what} hit a temporary provider error (${messageOf(error)}). Trying once more.`);
+    await wait(TRANSIENT_RETRY_DELAY_MS);
+    return await attempt();
+  }
+}
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -452,6 +487,7 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
   const readGit = deps.readGitStatus ?? gitStatus;
   const readDiff = deps.readDiffStat ?? gitDiffStat;
   const scan = deps.verify ?? verifyIntegration;
+  const wait = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 
   io.intro("Specify setup wizard");
 
@@ -520,10 +556,12 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
     try {
       // Turn one of the conversation, so every later turn inherits what the
       // agent read here instead of reading the codebase all over again.
-      const result = await conversation.run(`Investigating ${args.dir}`, buildReconPrompt(product), {
-        readOnly: true,
-        schema: reconSchema(product),
-      });
+      const result = await onceRetried(io, wait, "The investigation", () =>
+        conversation.run(`Investigating ${args.dir}`, buildReconPrompt(product), {
+          readOnly: true,
+          schema: reconSchema(product),
+        }),
+      );
       recon = normalizeRecon(result.json, product);
     } catch (error) {
       // Every turn runs on the same login, so an auth failure here dooms the
@@ -572,15 +610,27 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
     }
   }
 
+  const implementationPrompt = buildImplementationPrompt({
+    dir: args.dir,
+    key: keyChoice.key,
+    product,
+    recon,
+    report: runner.canSchema,
+  });
+  let editAttempts = 0;
+
   let report: TurnReport;
   try {
-    report = await editingTurn(
-      conversation,
-      io,
-      `Integrating ${spec.packageName}`,
-      buildImplementationPrompt({ dir: args.dir, key: keyChoice.key, product, recon, report: runner.canSchema }),
-      runner.canSchema,
-    );
+    report = await onceRetried(io, wait, runner.name, () => {
+      editAttempts += 1;
+      // On the retry, the interrupted attempt may already have written part of
+      // the integration; the agent must pick that up, not write it twice.
+      const prompt =
+        editAttempts === 1
+          ? implementationPrompt
+          : `${implementationPrompt}\n\nIMPORTANT: an earlier attempt at this exact task was interrupted partway and may already have written some of the integration. Check what already exists and reconcile — complete or correct it, never duplicate it.`;
+      return editingTurn(conversation, io, `Integrating ${spec.packageName}`, prompt, runner.canSchema);
+    });
   } catch (error) {
     await conversation.close();
     io.error(`${runner.name} failed: ${messageOf(error)}`);

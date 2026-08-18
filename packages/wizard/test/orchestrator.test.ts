@@ -434,6 +434,74 @@ describe("runWizard — the two-turn flow", () => {
     expect(io.output).not.toContain("cannot investigate read-only");
   });
 
+  it("retries recon once after a transient provider error and carries on", async () => {
+    const runs: RecordedRun[] = [];
+    const io = new ScriptedIo();
+    const gateway = fakeGateway({
+      replies: [
+        { error: new Error("API Error: 529 Overloaded. This is a server-side issue, usually temporary") },
+        { json: RECON_FIXTURE },
+        { json: REPORT_FIXTURE },
+      ],
+      runs,
+    });
+
+    const code = await runWizard(
+      args({ key: VALID_PUBLISHER_KEY, product: "publisher", yes: true }),
+      deps({ gateway, io, sleep: async () => undefined }),
+    );
+
+    expect(code).toBe(EXIT_OK);
+    expect(io.output).toContain("Trying once more");
+    // Two recon attempts, then one implementation turn — no combined-pass fallback.
+    expect(runs).toHaveLength(3);
+    expect(runs[0].prompt).toBe(runs[1].prompt);
+  });
+
+  it("retries the implementation once after a transient error, telling the agent to reconcile partial work", async () => {
+    const runs: RecordedRun[] = [];
+    const io = new ScriptedIo();
+    const gateway = fakeGateway({
+      replies: [
+        { json: RECON_FIXTURE },
+        { error: new Error("API Error: Server error mid-response.") },
+        { json: REPORT_FIXTURE },
+      ],
+      runs,
+    });
+
+    const code = await runWizard(
+      args({ key: VALID_PUBLISHER_KEY, product: "publisher", yes: true }),
+      deps({ gateway, io, sleep: async () => undefined }),
+    );
+
+    expect(code).toBe(EXIT_OK);
+    expect(runs).toHaveLength(3);
+    expect(runs[1].prompt).not.toContain("interrupted partway");
+    expect(runs[2].prompt).toContain("interrupted partway");
+  });
+
+  it("gives up after a second transient failure instead of retrying forever", async () => {
+    const runs: RecordedRun[] = [];
+    const io = new ScriptedIo();
+    const gateway = fakeGateway({
+      replies: [
+        { json: RECON_FIXTURE },
+        { error: new Error("API Error: 529 Overloaded") },
+        { error: new Error("API Error: 529 Overloaded") },
+      ],
+      runs,
+    });
+
+    const code = await runWizard(
+      args({ key: VALID_PUBLISHER_KEY, product: "publisher", yes: true }),
+      deps({ gateway, io, sleep: async () => undefined }),
+    );
+
+    expect(code).toBe(EXIT_FAILED);
+    expect(runs).toHaveLength(3);
+  });
+
   it("adds login guidance when the implementation turn fails on authentication", async () => {
     const io = new ScriptedIo();
     const gateway = fakeGateway({
