@@ -16,7 +16,7 @@
  */
 
 import type { AgentGateway, AgentOption, AgentRunner, WizardRun, WizardRunResult, WizardTurnOptions } from "./agent";
-import { asSchemaFailure, describeEvent } from "./agent";
+import { asSchemaFailure, describeEvent, isAuthFailure } from "./agent";
 import type { WizardArgs } from "./args";
 import { renderManualInstructions } from "./fallback";
 import { type GitStatus, gitDiffStat, gitStatus } from "./git";
@@ -514,6 +514,7 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
 
   const canRecon = runner.canReadOnly && runner.canSchema;
   let recon: Recon | null = null;
+  let reconFailed = false;
 
   if (canRecon) {
     try {
@@ -525,6 +526,17 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
       });
       recon = normalizeRecon(result.json, product);
     } catch (error) {
+      // Every turn runs on the same login, so an auth failure here dooms the
+      // fallback pass too. Stop now with the actual fix.
+      if (isAuthFailure(error)) {
+        await conversation.close();
+        io.error(`${runner.name} is not logged in: ${messageOf(error)}`);
+        io.outro(
+          `Log in with ${runner.name}'s own CLI (for Claude Code: \`claude login\`) and run the wizard again. Nothing was changed.`,
+        );
+        return EXIT_FAILED;
+      }
+      reconFailed = true;
       io.warn(
         `The read-only investigation did not complete (${messageOf(error)}). Falling back to a single pass that investigates as it goes.`,
       );
@@ -544,7 +556,9 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
     io.outro(
       recon
         ? "Dry run — nothing was changed. Re-run without --dry-run to apply this plan."
-        : "Dry run — nothing was changed. This agent cannot investigate read-only, so there is no plan to show.",
+        : reconFailed
+          ? "Dry run — nothing was changed. The investigation failed (see above), so there is no plan to show."
+          : "Dry run — nothing was changed. This agent cannot investigate read-only, so there is no plan to show.",
     );
     return EXIT_OK;
   }
@@ -570,6 +584,9 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
   } catch (error) {
     await conversation.close();
     io.error(`${runner.name} failed: ${messageOf(error)}`);
+    if (isAuthFailure(error)) {
+      io.warn(`Log in with ${runner.name}'s own CLI (for Claude Code: \`claude login\`) and run the wizard again.`);
+    }
     io.warn("Check `git status` — the run may have changed files before it stopped.");
     return EXIT_FAILED;
   }

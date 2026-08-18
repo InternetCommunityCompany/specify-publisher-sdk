@@ -125,6 +125,23 @@ export function asSchemaFailure(error: unknown): SchemaFailure | null {
   };
 }
 
+/**
+ * Recognise "the agent CLI is not logged in" among whatever a turn threw.
+ *
+ * AnyAgent has no auth error code — an expired login surfaces as a generic
+ * invocation failure carrying the CLI's own message — so this matches on the
+ * words those messages actually use. A match means every further turn will
+ * fail the same way, and the only fix is the agent's own login command; the
+ * orchestrator stops early instead of cascading into more doomed runs.
+ *
+ * @param error - Whatever a turn rejected with
+ * @returns True when the failure reads as an authentication problem
+ */
+export function isAuthFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /authenticat|oauth|logged out|not logged in|login required|please log in|api key/i.test(message);
+}
+
 /** Discovery and construction of coding agents. */
 export interface AgentGateway {
   list: () => Promise<AgentOption[]>;

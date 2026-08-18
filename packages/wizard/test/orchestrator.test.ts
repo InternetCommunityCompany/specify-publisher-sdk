@@ -393,6 +393,61 @@ describe("runWizard — the two-turn flow", () => {
     expect(runs[1].prompt).toContain("Investigate before you edit");
     expect(io.output).toContain("recon exploded");
   });
+
+  it("stops with login guidance when recon fails on authentication, instead of a doomed fallback", async () => {
+    const runs: RecordedRun[] = [];
+    const io = new ScriptedIo();
+    const gateway = fakeGateway({
+      failOn: (prompt) =>
+        prompt.includes("READ-ONLY")
+          ? new Error("Failed to authenticate: OAuth session expired and could not be refreshed")
+          : undefined,
+      runs,
+    });
+
+    const code = await runWizard(
+      args({ key: VALID_PUBLISHER_KEY, product: "publisher", yes: true }),
+      deps({ gateway, io }),
+    );
+
+    expect(code).toBe(EXIT_FAILED);
+    // No second run: every turn shares the login, so the fallback would fail identically.
+    expect(runs).toHaveLength(1);
+    expect(io.output).toContain("not logged in");
+    expect(io.output).toContain("claude login");
+    expect(io.output).toContain("Nothing was changed");
+  });
+
+  it("names the real reason in the dry-run outro when recon failed rather than being unsupported", async () => {
+    const io = new ScriptedIo();
+    const gateway = fakeGateway({
+      failOn: (prompt) => (prompt.includes("READ-ONLY") ? new Error("recon exploded") : undefined),
+    });
+
+    const code = await runWizard(
+      args({ dryRun: true, key: VALID_PUBLISHER_KEY, product: "publisher", yes: true }),
+      deps({ gateway, io }),
+    );
+
+    expect(code).toBe(EXIT_OK);
+    expect(io.output).toContain("The investigation failed");
+    expect(io.output).not.toContain("cannot investigate read-only");
+  });
+
+  it("adds login guidance when the implementation turn fails on authentication", async () => {
+    const io = new ScriptedIo();
+    const gateway = fakeGateway({
+      failOn: (prompt) => (prompt.includes("READ-ONLY") ? undefined : new Error("please log in: token rejected")),
+    });
+
+    const code = await runWizard(
+      args({ key: VALID_PUBLISHER_KEY, product: "publisher", yes: true }),
+      deps({ gateway, io }),
+    );
+
+    expect(code).toBe(EXIT_FAILED);
+    expect(io.output).toContain("claude login");
+  });
 });
 
 /** A recon reply, then the report the implementation turn answers with. */

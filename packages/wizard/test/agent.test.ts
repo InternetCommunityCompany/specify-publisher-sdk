@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { asSchemaFailure, createAnyAgentGateway, describeEvent, toWizardEvent } from "../lib/agent";
+import { asSchemaFailure, createAnyAgentGateway, describeEvent, isAuthFailure, toWizardEvent } from "../lib/agent";
 import { fakeAdapter, fakeProbe } from "./fixtures";
 
 /** Drain a run's events and resolve with its result. */
@@ -268,6 +268,25 @@ describe("asSchemaFailure", () => {
     expect(asSchemaFailure(new Error("the CLI exited 1"))).toBeNull();
     expect(asSchemaFailure("nope")).toBeNull();
     expect(asSchemaFailure(null)).toBeNull();
+  });
+});
+
+describe("isAuthFailure", () => {
+  it("recognises the messages real CLIs emit when logged out", () => {
+    // Verbatim from claude-code on this machine, 2026-08-18.
+    expect(
+      isAuthFailure(new Error("claude-code: Failed to authenticate: OAuth session expired and could not be refreshed")),
+    ).toBe(true);
+    expect(isAuthFailure(new Error("please log in: token rejected"))).toBe(true);
+    expect(isAuthFailure(new Error("Not logged in. Run `codex auth`."))).toBe(true);
+    expect(isAuthFailure("Invalid API key")).toBe(true);
+  });
+
+  it("leaves every other failure alone", () => {
+    expect(isAuthFailure(new Error("the CLI exited 1"))).toBe(false);
+    expect(isAuthFailure(new Error("ENOENT: no such file"))).toBe(false);
+    expect(isAuthFailure({ code: "Parse" })).toBe(false);
+    expect(isAuthFailure(null)).toBe(false);
   });
 });
 
