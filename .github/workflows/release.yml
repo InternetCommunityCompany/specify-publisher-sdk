@@ -30,8 +30,9 @@ jobs:
       - name: 🔨 Build Packages
         run: bun run build
 
-      # @specify-sh/core is private and is bundled into each published
-      # package's dist output, so only the two SDKs are published.
+      # @specify-sh/core is private and is bundled into each published SDK's
+      # dist output, so it is never published itself. The wizard is a CLI and
+      # depends on no workspace package at all, so it publishes as-is.
       - name: 📤 Publish Publisher SDK to NPM
         run: npm publish --access public
         working-directory: packages/sdk
@@ -41,5 +42,11 @@ jobs:
       - name: 📤 Publish Advertiser SDK to NPM
         run: npm publish --access public
         working-directory: packages/advertiser
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 📤 Publish Setup Wizard to NPM
+        run: npm publish --access public
+        working-directory: packages/wizard
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

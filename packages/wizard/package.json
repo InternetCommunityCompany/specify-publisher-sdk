@@ -1,0 +1,33 @@
+{
+  "name": "@specify-sh/wizard",
+  "version": "1.0.0",
+  "description": "Setup wizard that integrates the Specify SDKs into your codebase using the coding agent you already have",
+  "main": "dist/cli.js",
+  "types": "dist/cli.d.ts",
+  "type": "module",
+  "bin": {
+    "specify-wizard": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "bun run build.mts",
+    "types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "files": ["dist"],
+  "keywords": ["specify", "wizard", "setup", "cli", "coding-agent"],
+  "author": "Specify",
+  "license": "MIT",
+  "homepage": "https://specify.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InternetCommunityCompany/specify-publisher-sdk.git"
+  },
+  "bugs": "https://github.com/InternetCommunityCompany/specify-publisher-sdk/issues",
+  "dependencies": {
+    "@clack/prompts": "^1.0.0",
+    "anyagent-js": "^0.3.0"
+  }
+}

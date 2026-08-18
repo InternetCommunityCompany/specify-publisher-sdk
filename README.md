@@ -29,6 +29,22 @@ The Specify Publisher SDK enables publishers to serve targeted ad content to use
 
 Upgrading is a version bump: see [Migrating from 0.4.x](#migrating-from-04x).
 
+## Setup wizard
+
+If you would rather not wire this up by hand:
+
+```bash
+npx @specify-sh/wizard
+```
+
+`@specify-sh/wizard` adds either SDK to your codebase by driving the coding-agent CLI you already have — Claude Code, Codex, Cursor, Gemini CLI, opencode and others. It never asks for an API key and never runs a model itself: your agent supplies the model and the auth, Specify supplies the prompt, the current API reference and the guardrails.
+
+It reads your project read-only first, shows you a plan, then writes the integration and verifies the result against your tree. Add `--publisher` or `--advertiser` to skip the question, `--key` to supply your key, and `--dry-run` to see the plan without changing anything.
+
+If you have no coding agent installed, that is not an error — the wizard prints the complete manual integration for the SDK you chose and exits without touching your files.
+
+See [`packages/wizard`](packages/wizard/README.md) for the full flag list.
+
 ## Installation
 
 ```bash
@@ -399,7 +415,7 @@ Commands are `init`, `consent`, `revokeConsent`, `identify` and `event`; anythin
 
 - [Bun](https://bun.sh)
 
-This repository is a Bun workspaces monorepo. `packages/sdk` is the published `@specify-sh/sdk` package and `packages/advertiser` the published `@specify-sh/advertiser` package; `packages/core` is private shared plumbing that is bundled into both packages' output.
+This repository is a Bun workspaces monorepo. `packages/sdk` is the published `@specify-sh/sdk` package, `packages/advertiser` the published `@specify-sh/advertiser` package, and `packages/wizard` the published `@specify-sh/wizard` CLI; `packages/core` is private shared plumbing that is bundled into both SDKs' output. The wizard depends on no workspace package, so it publishes as-is.
 
 ```bash
 # Clone the repository
