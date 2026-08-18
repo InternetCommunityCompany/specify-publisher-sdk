@@ -1,0 +1,22 @@
+{
+  "name": "@specify-sh/core",
+  "version": "0.1.0",
+  "description": "Internal shared plumbing for the Specify SDKs. Never published.",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./lib/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "author": "Specify",
+  "license": "MIT"
+}

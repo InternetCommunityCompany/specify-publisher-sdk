@@ -1,7 +1,7 @@
 # dependencies
 node_modules
 
-# production
+# production (packages/*/dist)
 dist
 
 # testing

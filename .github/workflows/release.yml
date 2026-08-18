@@ -27,10 +27,13 @@ jobs:
         run: |
           bun test
 
-      - name: 🔨 Build Package
+      - name: 🔨 Build Packages
         run: bun run build
 
+      # Only @specify-sh/sdk is published; @specify-sh/core is private and is
+      # bundled into the sdk's dist output.
       - name: 📤 Publish to NPM
         run: npm publish --access public
+        working-directory: packages/sdk
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

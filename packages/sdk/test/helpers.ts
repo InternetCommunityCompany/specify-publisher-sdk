@@ -14,6 +14,16 @@ export interface ErrorResponse {
   }>;
 }
 
+export interface RecordedRequest {
+  url: string;
+  init: RequestInit | undefined;
+}
+
+/** Captured before any test installs a mock, so `restoreFetch` is truthful. */
+const originalFetch = globalThis.fetch;
+
+let recorded: RecordedRequest[] = [];
+
 export const setupMockFetch = <T>(response: T, status = 200, contentType = "application/json") => {
   // Mock the global fetch function
   globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
@@ -31,6 +41,8 @@ export const setupMockFetch = <T>(response: T, status = 200, contentType = "appl
     if (init?.headers && !(init.headers as Record<string, string>)["x-api-key"]) {
       throw new Error("Missing x-api-key header");
     }
+
+    recorded.push({ init, url });
 
     return Promise.resolve({
       status,
@@ -58,4 +70,28 @@ export const setupMockFetch = <T>(response: T, status = 200, contentType = "appl
       },
     } as MockResponse<T>);
   };
+};
+
+/** Every request the mock has seen since the last {@link resetFetchCalls}. */
+export const getFetchCalls = (): RecordedRequest[] => recorded;
+
+export const getLastFetchCall = (): RecordedRequest | undefined => recorded[recorded.length - 1];
+
+/** Parse the JSON body of the most recent request. */
+export const getLastRequestBody = <T = Record<string, unknown>>(): T => {
+  const call = getLastFetchCall();
+  if (!call?.init?.body) {
+    throw new Error("No request has been recorded");
+  }
+  return JSON.parse(call.init.body as string) as T;
+};
+
+export const resetFetchCalls = (): void => {
+  recorded = [];
+};
+
+/** Put the real `fetch` back and clear the recording. */
+export const restoreFetch = (): void => {
+  globalThis.fetch = originalFetch;
+  resetFetchCalls();
 };

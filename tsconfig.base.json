@@ -9,14 +9,11 @@
     "noUnusedLocals": true,
     "noImplicitAny": true,
     "allowJs": true,
-    "outDir": "dist",
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
-  },
-  "include": ["lib/**/*"],
-  "exclude": ["node_modules", "dist"]
+  }
 }

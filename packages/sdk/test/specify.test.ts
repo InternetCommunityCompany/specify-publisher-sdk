@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import Specify, { APIError, AuthenticationError, ValidationError, ImageFormat, type Address } from "../lib";
+import { uninstallBrowser } from "./browser";
 import { VALID_MOCK_PUBLISHER_KEY, VALID_MOCK_WALLET_ADDRESS } from "./consts";
-import { setupMockFetch } from "./helpers";
+import { resetFetchCalls, restoreFetch, setupMockFetch } from "./helpers";
 
 interface MockSpecifyAd {
   walletAddress?: string;
@@ -18,6 +19,17 @@ interface MockSpecifyAd {
 }
 
 describe("Specify", () => {
+  // These are the pre-v1 tests, which assert the server-side (non-browser)
+  // behaviour. Another suite may have left a stub `window` behind.
+  beforeEach(() => {
+    uninstallBrowser();
+    resetFetchCalls();
+  });
+
+  afterAll(() => {
+    restoreFetch();
+  });
+
   describe("constructor", () => {
     it("should initialize with valid publisher key", () => {
       const specify = new Specify({

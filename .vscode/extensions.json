@@ -1,6 +1,3 @@
 {
-  "recommendations": [
-    "biomejs.biome",
-    "aaron-bond.better-comments"
-  ]
+  "recommendations": ["biomejs.biome", "aaron-bond.better-comments"]
 }

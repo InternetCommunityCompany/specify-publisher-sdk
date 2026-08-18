@@ -30,3 +30,11 @@ jobs:
         name: ✅ Run test
         run: |
           bun test
+
+      - id: types
+        name: 🔎 Typecheck
+        run: bun run types
+
+      - id: build
+        name: 🔨 Build Packages
+        run: bun run build
