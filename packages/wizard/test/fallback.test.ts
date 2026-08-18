@@ -18,7 +18,7 @@ describe("renderManualInstructions — publisher", () => {
   });
 
   it("gives an install command", () => {
-    expect(text).toContain("npm install @specify-sh/sdk");
+    expect(text).toContain("npm install @specify-sh/sdk@^1");
   });
 
   it("shows the real constructor with the user's key", () => {

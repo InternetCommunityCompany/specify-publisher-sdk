@@ -235,7 +235,7 @@ describe("runWizard — the no-agent fallback", () => {
 
     expect(code).toBe(EXIT_OK);
     expect(io.output).toContain("No supported coding agent was found");
-    expect(io.output).toContain("npm install @specify-sh/sdk");
+    expect(io.output).toContain("npm install @specify-sh/sdk@^1");
     expect(io.output).toContain("https://spfsrv.com/sdk/v1.js");
     expect(io.output).toContain("consentForEnhancedTracking");
   });

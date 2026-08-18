@@ -18,8 +18,14 @@ Serves Specify ads against the wallet addresses a page knows about.
 
 ## Install
 
-npm install @specify-sh/sdk
-(or: bun add / yarn add / pnpm add @specify-sh/sdk)
+npm install @specify-sh/sdk@^1
+(or: bun add / yarn add / pnpm add @specify-sh/sdk@^1)
+
+Everything in this reference is the v1 API. Older majors (0.4.x) have a
+different, smaller API — never install or write against one. If the package
+manager cannot resolve ^1, do not fall back to an older version: add
+"@specify-sh/sdk": "^1.0.0" to package.json by hand, skip the install, and
+report that in your summary.
 
 ## Create the client
 
@@ -195,8 +201,13 @@ Events are reporting only — Specify never bills on them, there is no allowlist
 
 ## Install
 
-npm install @specify-sh/advertiser
-(or: bun add / yarn add / pnpm add @specify-sh/advertiser)
+npm install @specify-sh/advertiser@^1
+(or: bun add / yarn add / pnpm add @specify-sh/advertiser@^1)
+
+Everything in this reference is the v1 API. If the package manager cannot
+resolve ^1, do not substitute any other package or version: add
+"@specify-sh/advertiser": "^1.0.0" to package.json by hand, skip the install,
+and report that in your summary.
 
 ## Create the client
 
