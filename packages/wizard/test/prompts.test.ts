@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { placeholderKey } from "../lib/keys";
-import { SYSTEM_PROMPT, buildCombinedPrompt, buildImplementationPrompt, buildReconPrompt } from "../lib/prompts";
+import {
+  SYSTEM_PROMPT,
+  buildCombinedPrompt,
+  buildFollowUpPrompt,
+  buildImplementationPrompt,
+  buildReconPrompt,
+} from "../lib/prompts";
 import { normalizeRecon } from "../lib/recon";
 import { ADVERTISER_REFERENCE, PUBLISHER_REFERENCE } from "../lib/references";
 import { RECON_FIXTURE, VALID_ADVERTISER_KEY, VALID_PUBLISHER_KEY } from "./fixtures";
@@ -150,6 +156,27 @@ describe("buildImplementationPrompt", () => {
     });
   });
 
+  it("sends the turn's answer to the report schema, not to a closing message", () => {
+    const prompt = buildImplementationPrompt({ dir: DIR, key: VALID_PUBLISHER_KEY, product: "publisher", recon });
+    expect(prompt).toContain("answering with the JSON report");
+    expect(prompt).toContain("filesChanged");
+    expect(prompt).toContain("belongs in questions rather than being guessed at");
+  });
+
+  it("asks for a prose summary instead when the agent cannot do structured output", () => {
+    const prompt = buildImplementationPrompt({
+      dir: DIR,
+      key: VALID_PUBLISHER_KEY,
+      product: "publisher",
+      recon,
+      report: false,
+    });
+    expect(prompt).not.toContain("JSON report");
+    expect(prompt).toContain("Finish by summarising, in your final message");
+    // Every other guardrail is unchanged.
+    expect(prompt).toContain("NEVER hardcode consent as granted");
+  });
+
   it("adds a placeholder warning only when the key is a placeholder", () => {
     const real = buildImplementationPrompt({ dir: DIR, key: VALID_PUBLISHER_KEY, product: "publisher", recon });
     expect(real).not.toContain("PLACEHOLDER");
@@ -177,6 +204,53 @@ describe("buildCombinedPrompt", () => {
     expect(prompt).toContain("NEVER hardcode consent as granted");
     expect(prompt).toContain("Touch only the files the integration actually requires");
     expect(prompt).toContain(PUBLISHER_REFERENCE);
+  });
+});
+
+describe("buildFollowUpPrompt", () => {
+  it("carries the developer's words through verbatim", () => {
+    const prompt = buildFollowUpPrompt({ kind: "changes", message: "  Put the ad below the fold instead.  " });
+    expect(prompt).toContain("Put the ad below the fold instead.");
+    expect(prompt).toContain("wants changes");
+  });
+
+  it("never resends the reference or the guardrails — the session already holds them", () => {
+    const prompt = buildFollowUpPrompt({ kind: "changes", message: "move it" });
+    expect(prompt).not.toContain(PUBLISHER_REFERENCE);
+    expect(prompt).not.toContain(ADVERTISER_REFERENCE);
+    expect(prompt).not.toContain("NEVER hardcode consent as granted");
+    expect(prompt.length).toBeLessThan(1200);
+  });
+
+  it("reminds the agent that every rule still stands", () => {
+    const prompt = buildFollowUpPrompt({ kind: "changes", message: "move it" });
+    expect(prompt).toContain("still applies");
+    expect(prompt).toContain("same key exactly as given");
+    expect(prompt).toContain("change only what this needs");
+    expect(prompt).toContain("do not start over");
+  });
+
+  it("asks for the same report shape again", () => {
+    for (const kind of ["answers", "changes", "verification"] as const) {
+      expect(buildFollowUpPrompt({ kind, message: "x" })).toContain("same JSON report");
+    }
+  });
+
+  it("quotes the questions back when the developer is answering them", () => {
+    const prompt = buildFollowUpPrompt({
+      kind: "answers",
+      message: "Use the sidebar slot.",
+      questions: [{ question: "Which slot should the ad go in?" }, { question: "Is the banner the real gate?" }],
+    });
+    expect(prompt).toContain("1. Which slot should the ad go in?");
+    expect(prompt).toContain("2. Is the banner the real gate?");
+    expect(prompt).toContain("Use the sidebar slot.");
+  });
+
+  it("says who is asking when the wizard's own scan found the gap", () => {
+    const prompt = buildFollowUpPrompt({ kind: "verification", message: "- serve is missing. Call `serve(...)`." });
+    expect(prompt).toContain("The wizard scanned the project");
+    expect(prompt).toContain("serve is missing");
   });
 });
 

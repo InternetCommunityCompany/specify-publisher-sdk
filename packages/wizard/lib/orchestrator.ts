@@ -1,6 +1,13 @@
 /**
- * The wizard itself: the order of the questions, which passes run, and what
+ * The wizard itself: the order of the questions, which turns run, and what
  * happens when each of them cannot.
+ *
+ * The agent is driven as a conversation, not a one-shot command: recon,
+ * implementation and every follow-up the user asks for are turns of one
+ * session, so the agent keeps everything it read and wrote between them. On an
+ * agent that cannot hold a conversation the same turns run as independent runs,
+ * which is exactly the flow this had before — minus the follow-ups, which need
+ * the shared context to mean anything.
  *
  * Every capability this needs arrives as an injected dependency, so the whole
  * flow — including the no-agent fallback and the dry run — can be driven in a
@@ -8,16 +15,24 @@
  * reads a keystroke on its own.
  */
 
-import type { AgentGateway, AgentOption, AgentRunner, WizardRunResult } from "./agent";
-import { describeEvent } from "./agent";
+import type { AgentGateway, AgentOption, AgentRunner, WizardRun, WizardRunResult, WizardTurnOptions } from "./agent";
+import { asSchemaFailure, describeEvent } from "./agent";
 import type { WizardArgs } from "./args";
 import { renderManualInstructions } from "./fallback";
 import { type GitStatus, gitDiffStat, gitStatus } from "./git";
-import { CANCELLED, type WizardIo } from "./io";
+import { CANCELLED, type SelectChoice, type WizardIo } from "./io";
 import { isPlaceholderKey, normalizeKey, placeholderKey, validateKey } from "./keys";
 import { PRODUCTS, PRODUCT_IDS, type ProductId, isProductId } from "./products";
-import { SYSTEM_PROMPT, buildImplementationPrompt, buildReconPrompt } from "./prompts";
+import {
+  type FollowUpKind,
+  type FollowUpPromptInput,
+  SYSTEM_PROMPT,
+  buildFollowUpPrompt,
+  buildImplementationPrompt,
+  buildReconPrompt,
+} from "./prompts";
 import { type Recon, normalizeRecon, reconSchema, renderPlan } from "./recon";
+import { type TurnReport, normalizeTurnReport, renderQuestions, renderTurnReport, turnReportSchema } from "./report";
 import { type VerificationResult, renderVerification, verifyIntegration } from "./verify";
 
 export interface WizardDeps {
@@ -35,6 +50,10 @@ export interface WizardDeps {
 export const EXIT_OK = 0;
 export const EXIT_FAILED = 1;
 export const EXIT_CANCELLED = 130;
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 async function pickProduct(args: WizardArgs, io: WizardIo): Promise<ProductId | typeof CANCELLED> {
   if (args.product) {
@@ -160,28 +179,35 @@ async function pickAgent(
 }
 
 /**
- * Run one pass and return its result, streaming events to a spinner.
+ * The wizard's view of the agent: a sequence of turns, however the agent
+ * happens to deliver them.
+ */
+interface Conversation {
+  /**
+   * Whether turns share context. False on an agent that cannot hold a session,
+   * where a follow-up would be a fresh agent with no memory of the diff it is
+   * being asked to amend — worse than not offering one.
+   */
+  canFollowUp: boolean;
+  close: () => Promise<void>;
+  run: (label: string, prompt: string, options: WizardTurnOptions) => Promise<WizardRunResult>;
+}
+
+/**
+ * Run one turn and return its result, streaming events to a spinner.
  *
- * @param runner - The agent to run
  * @param io - Terminal interface
  * @param label - Spinner label
- * @param prompt - The prompt
- * @param options - Run options
- * @returns The run result
+ * @param start - Starts the turn; called inside the spinner so a synchronous
+ *   throw is reported like any other failure
+ * @returns The turn result
  */
-async function runPass(
-  runner: AgentRunner,
-  io: WizardIo,
-  label: string,
-  prompt: string,
-  options: { cwd: string; readOnly?: boolean; schema?: Record<string, unknown> },
-): Promise<WizardRunResult> {
+async function runTurn(io: WizardIo, label: string, start: () => WizardRun): Promise<WizardRunResult> {
   const spin = io.spinner();
   spin.start(label);
 
-  const run = runner.run(prompt, { ...options, systemPrompt: SYSTEM_PROMPT });
-
   try {
+    const run = start();
     for await (const event of run.events) {
       const message = describeEvent(event);
       if (message) {
@@ -194,6 +220,223 @@ async function runPass(
   } catch (error) {
     spin.stop(`${label} — failed`);
     throw error;
+  }
+}
+
+/**
+ * Open a conversation with the chosen agent, falling back to one-shot runs.
+ *
+ * @param runner - The agent to drive
+ * @param io - Terminal interface
+ * @param cwd - The project every turn works in
+ * @returns A conversation, multi-turn where the agent can manage it
+ */
+function openConversation(runner: AgentRunner, io: WizardIo, cwd: string): Conversation {
+  try {
+    const session = runner.session({ cwd });
+    return {
+      canFollowUp: true,
+      close: () => session.close(),
+      run: (label, prompt, options) =>
+        runTurn(io, label, () => session.run(prompt, { ...options, systemPrompt: SYSTEM_PROMPT })),
+    };
+  } catch (error) {
+    io.info(
+      `${runner.name} cannot hold a multi-turn conversation (${messageOf(error)}), so each pass runs on its own and the wizard cannot take follow-up requests afterwards.`,
+    );
+    return {
+      canFollowUp: false,
+      close: async () => undefined,
+      run: (label, prompt, options) =>
+        runTurn(io, label, () => runner.run(prompt, { ...options, cwd, systemPrompt: SYSTEM_PROMPT })),
+    };
+  }
+}
+
+/**
+ * Run a turn that edits the repository and return its report.
+ *
+ * The schema gets no retries: AnyAgent's default correction is a second full
+ * agent run, which on an editing turn means acting on the codebase twice. A
+ * reply that fails validation is therefore surfaced as it came back and the
+ * conversation carries on — the work the turn did is already on disk either way.
+ *
+ * @param conversation - The open conversation
+ * @param io - Terminal interface
+ * @param label - Spinner label
+ * @param prompt - The prompt for this turn
+ * @param canSchema - Whether this agent can return structured output at all
+ * @returns The turn's report
+ */
+async function editingTurn(
+  conversation: Conversation,
+  io: WizardIo,
+  label: string,
+  prompt: string,
+  canSchema: boolean,
+): Promise<TurnReport> {
+  const options: WizardTurnOptions = canSchema ? { schema: turnReportSchema(), schemaRetries: 0 } : {};
+
+  try {
+    const result = await conversation.run(label, prompt, options);
+    return normalizeTurnReport(result.json, result.text);
+  } catch (error) {
+    const failure = asSchemaFailure(error);
+    if (!failure) {
+      throw error;
+    }
+    io.warn(
+      `The agent's report did not match the shape the wizard asked for (${failure.issues.join("; ") || "no detail given"}), so it is shown below exactly as it came back. Whatever the turn changed is still on disk.`,
+    );
+    return normalizeTurnReport(null, failure.raw);
+  }
+}
+
+const FOLLOW_UP_LABELS: Record<FollowUpKind, string> = {
+  answers: "Working from your answers",
+  changes: "Applying your changes",
+  verification: "Filling in what was missing",
+};
+
+/** Everything the conversation loop needs, gathered once. */
+interface LoopContext {
+  canSchema: boolean;
+  conversation: Conversation;
+  dir: string;
+  io: WizardIo;
+  product: ProductId;
+  scan: (dir: string, product: ProductId) => Promise<VerificationResult>;
+  /** Title for the block each report is rendered into. */
+  title: string;
+}
+
+/**
+ * Show a turn report.
+ *
+ * Questions get their own block: they are the one part of a report the user has
+ * to act on, and burying them under a file list is how they get missed.
+ *
+ * @param io - Terminal interface
+ * @param report - The report to show
+ * @param title - Title for the summary block
+ */
+function showReport(io: WizardIo, report: TurnReport, title: string): void {
+  const body = renderTurnReport(report);
+  if (body) {
+    io.note(body, title);
+  }
+  if (report.questions.length > 0) {
+    io.note(renderQuestions(report.questions), "It needs you to decide");
+  }
+}
+
+/** The missing required markers, phrased for the agent rather than the user. */
+function gapsFor(verification: VerificationResult): string {
+  return verification.markers
+    .filter((marker) => marker.required && !marker.found)
+    .map((marker) => `- ${marker.label} is missing. ${marker.hint}`)
+    .join("\n");
+}
+
+/**
+ * Take one follow-up turn, keeping the conversation alive if it fails.
+ *
+ * A failed turn is not the end of the session — AnyAgent resumes from the last
+ * good point on the next call — so the user is told and put back in front of
+ * the same menu rather than dropped out of the wizard.
+ *
+ * @param context - The loop's dependencies
+ * @param input - What to ask for
+ * @param previous - The report to keep if the turn does not complete
+ * @returns The new report, or `previous` when the turn failed
+ */
+async function followUp(context: LoopContext, input: FollowUpPromptInput, previous: TurnReport): Promise<TurnReport> {
+  try {
+    return await editingTurn(
+      context.conversation,
+      context.io,
+      FOLLOW_UP_LABELS[input.kind],
+      buildFollowUpPrompt(input),
+      context.canSchema,
+    );
+  } catch (error) {
+    context.io.error(`That turn did not complete: ${messageOf(error)}`);
+    context.io.warn("The conversation is still open — ask again, ask for something else, or finish here.");
+    return previous;
+  }
+}
+
+interface LoopOutcome {
+  aborted: boolean;
+  /** The scan taken when the user finished; null when they aborted. */
+  verification: VerificationResult | null;
+}
+
+/**
+ * The conversation loop: show what the agent did, then let the user reply.
+ *
+ * There is no turn limit. The user leaves the loop by finishing or aborting,
+ * because only they know when the integration is right — a counter would only
+ * ever cut them off mid-thought.
+ *
+ * @param context - The loop's dependencies
+ * @param first - The report from the implementation turn
+ * @returns Whether the user aborted, and the verification if they did not
+ */
+async function converse(context: LoopContext, first: TurnReport): Promise<LoopOutcome> {
+  const { dir, io, product, scan, title } = context;
+  let report = first;
+
+  for (;;) {
+    showReport(io, report, title);
+
+    const choices: SelectChoice[] = [
+      { hint: "check the tree and show the diff", label: "Looks good — verify & finish", value: "finish" },
+      { hint: "tell it what to do differently", label: "Request changes", value: "changes" },
+    ];
+    if (report.questions.length > 0) {
+      choices.push({ hint: "settle what it could not work out", label: "Answer its questions", value: "answers" });
+    }
+    choices.push({ hint: "stop here and keep whatever is already written", label: "Abort", value: "abort" });
+
+    const choice = await io.select("What next?", choices);
+    if (choice === CANCELLED || choice === "abort") {
+      return { aborted: true, verification: null };
+    }
+
+    if (choice === "finish") {
+      const verification = await scan(dir, product);
+      io.note(renderVerification(verification, product), "Verification");
+      if (verification.complete) {
+        return { aborted: false, verification };
+      }
+      const retry = await io.confirm("Ask the agent to fix what is missing?", true);
+      if (retry !== true) {
+        return { aborted: false, verification };
+      }
+      report = await followUp(context, { kind: "verification", message: gapsFor(verification) }, report);
+      continue;
+    }
+
+    const answering = choice === "answers";
+    const reply = await io.text({
+      message: answering ? "Your answer" : "What should it do differently?",
+    });
+    if (reply === CANCELLED) {
+      return { aborted: true, verification: null };
+    }
+    if (reply.trim() === "") {
+      io.info("Nothing to send — pick again.");
+      continue;
+    }
+
+    report = await followUp(
+      context,
+      answering
+        ? { kind: "answers", message: reply, questions: report.questions }
+        : { kind: "changes", message: reply },
+      report,
+    );
   }
 }
 
@@ -267,20 +510,23 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
     return EXIT_FAILED;
   }
 
+  const conversation = openConversation(runner, io, args.dir);
+
   const canRecon = runner.canReadOnly && runner.canSchema;
   let recon: Recon | null = null;
 
   if (canRecon) {
     try {
-      const result = await runPass(runner, io, `Investigating ${args.dir}`, buildReconPrompt(product), {
-        cwd: args.dir,
+      // Turn one of the conversation, so every later turn inherits what the
+      // agent read here instead of reading the codebase all over again.
+      const result = await conversation.run(`Investigating ${args.dir}`, buildReconPrompt(product), {
         readOnly: true,
         schema: reconSchema(product),
       });
       recon = normalizeRecon(result.json, product);
     } catch (error) {
       io.warn(
-        `The read-only investigation did not complete (${error instanceof Error ? error.message : String(error)}). Falling back to a single pass that investigates as it goes.`,
+        `The read-only investigation did not complete (${messageOf(error)}). Falling back to a single pass that investigates as it goes.`,
       );
     }
   } else {
@@ -294,6 +540,7 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
   }
 
   if (args.dryRun) {
+    await conversation.close();
     io.outro(
       recon
         ? "Dry run — nothing was changed. Re-run without --dry-run to apply this plan."
@@ -305,32 +552,60 @@ export async function runWizard(args: WizardArgs, deps: WizardDeps): Promise<num
   if (recon && !args.yes) {
     const apply = await io.confirm("Apply this plan?", true);
     if (apply === CANCELLED || apply === false) {
+      await conversation.close();
       io.cancel("Nothing was changed.");
       return EXIT_CANCELLED;
     }
   }
 
-  let outcome: WizardRunResult;
+  let report: TurnReport;
   try {
-    outcome = await runPass(
-      runner,
+    report = await editingTurn(
+      conversation,
       io,
       `Integrating ${spec.packageName}`,
-      buildImplementationPrompt({ dir: args.dir, key: keyChoice.key, product, recon }),
-      { cwd: args.dir },
+      buildImplementationPrompt({ dir: args.dir, key: keyChoice.key, product, recon, report: runner.canSchema }),
+      runner.canSchema,
     );
   } catch (error) {
-    io.error(`${runner.name} failed: ${error instanceof Error ? error.message : String(error)}`);
+    await conversation.close();
+    io.error(`${runner.name} failed: ${messageOf(error)}`);
     io.warn("Check `git status` — the run may have changed files before it stopped.");
     return EXIT_FAILED;
   }
 
-  if (outcome.text.trim()) {
-    io.note(outcome.text.trim(), `What ${runner.name} did`);
+  const title = `What ${runner.name} did`;
+  let verification: VerificationResult | null = null;
+
+  // --yes is for CI: there is nobody to hold a conversation with, so the run
+  // ends after one implementation turn exactly as it always did.
+  if (args.yes || !conversation.canFollowUp) {
+    showReport(io, report, title);
+    if (report.questions.length > 0) {
+      io.warn(
+        `${runner.name} asked ${report.questions.length === 1 ? "a question" : `${report.questions.length} questions`} that nobody was there to answer — see above, and check its choices in the diff.`,
+      );
+    }
+  } else {
+    const outcome = await converse(
+      { canSchema: runner.canSchema, conversation, dir: args.dir, io, product, scan, title },
+      report,
+    );
+    if (outcome.aborted) {
+      await conversation.close();
+      io.warn("Whatever the agent already wrote is still in your tree — check `git status` and `git diff`.");
+      io.cancel("Stopped at your request.");
+      return EXIT_CANCELLED;
+    }
+    verification = outcome.verification;
   }
 
-  const verification = await scan(args.dir, product);
-  io.note(renderVerification(verification, product), "Verification");
+  await conversation.close();
+
+  if (verification === null) {
+    verification = await scan(args.dir, product);
+    io.note(renderVerification(verification, product), "Verification");
+  }
 
   const diff = await readDiff(args.dir);
   if (diff) {

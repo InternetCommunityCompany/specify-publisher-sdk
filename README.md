@@ -39,7 +39,7 @@ npx @specify-sh/wizard
 
 `@specify-sh/wizard` adds either SDK to your codebase by driving the coding-agent CLI you already have — Claude Code, Codex, Cursor, Gemini CLI, opencode and others. It never asks for an API key and never runs a model itself: your agent supplies the model and the auth, Specify supplies the prompt, the current API reference and the guardrails.
 
-It reads your project read-only first, shows you a plan, then writes the integration and verifies the result against your tree. Add `--publisher` or `--advertiser` to skip the question, `--key` to supply your key, and `--dry-run` to see the plan without changing anything.
+It reads your project read-only first, shows you a plan, then writes the integration and verifies the result against your tree. Afterwards it stays in the conversation: each turn reports what it changed, what it decided for you and what it could not work out, and you can request changes in your own words or answer its questions as often as you like. Every follow-up is another turn of the same session, so the agent amends its work instead of starting over. Add `--publisher` or `--advertiser` to skip the question, `--key` to supply your key, `--dry-run` to see the plan without changing anything, and `--yes` for a single non-interactive pass in CI.
 
 If you have no coding agent installed, that is not an error — the wizard prints the complete manual integration for the SDK you chose and exits without touching your files.
 

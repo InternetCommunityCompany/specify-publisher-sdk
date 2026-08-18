@@ -8,6 +8,19 @@ import type { AgentEvent, RunResult, StdoutAdapter, VersionProbe } from "anyagen
 export const VALID_PUBLISHER_KEY = "spk_1234567890abcdef1234567890abcd";
 export const VALID_ADVERTISER_KEY = "adv_1234567890abcdef1234567890abcd";
 
+/** What a well-behaved editing turn reports back. */
+export const REPORT_FIXTURE = {
+  decisions: [{ decision: "Put the client in a provider rather than the layout", why: "the app already has one" }],
+  filesChanged: [
+    { path: "app/providers/specify.tsx", what: "creates the shared client" },
+    { path: "app/layout.tsx", what: "mounts the provider" },
+  ],
+  questions: [],
+  status: "complete",
+  summary: "Added the provider.",
+  warnings: ["No CMP found — added a consent stub with a TODO."],
+};
+
 /** What a well-behaved recon run returns for a Next.js app-router project. */
 export const RECON_FIXTURE = {
   cmp: {
@@ -38,7 +51,12 @@ export const RECON_FIXTURE = {
  * spawn a process and drive the real turn machinery — only the model is fake.
  * `parse` ignores that output and yields the events the test wants.
  *
- * @param options - The reply text, the events to emit, and capability overrides
+ * `resume` matters for sessions: AnyAgent refuses to open one on a stdout-mode
+ * agent that cannot resume, and a session that can resume still needs a
+ * `session` event to learn the handle its second turn continues from. Set
+ * `resume: "native"` and the adapter emits one.
+ *
+ * @param options - The replies, the events to emit, and capability overrides
  * @returns A `StdoutAdapter` usable with `detect({ adapters })`
  */
 export function fakeAdapter(options: {
@@ -47,10 +65,15 @@ export function fakeAdapter(options: {
   name?: string;
   readOnly?: "native" | "emulated" | false;
   reply?: string;
+  /** One reply per turn, in order; the last one repeats. Overrides `reply`. */
+  replies?: string[];
+  resume?: "native" | "emulated" | false;
   structuredOutput?: "native" | "emulated" | false;
 }): StdoutAdapter {
-  const reply = options.reply ?? "done";
+  const replies = options.replies ?? [options.reply ?? "done"];
   const id = options.id ?? "fake-agent";
+  const resume = options.resume ?? false;
+  let turn = 0;
 
   return {
     buildInvocation: () => ({ args: ["ok"], command: "/bin/echo" }),
@@ -63,7 +86,7 @@ export function fakeAdapter(options: {
       modelListing: false,
       modelSelection: false,
       readOnly: options.readOnly ?? "native",
-      resume: false,
+      resume,
       sessionFork: false,
       streaming: "native",
       structuredOutput: options.structuredOutput ?? "emulated",
@@ -75,6 +98,11 @@ export function fakeAdapter(options: {
     mode: "stdout",
     parse: async function* (source): AsyncGenerator<AgentEvent, RunResult> {
       await source.text();
+      const reply = replies[Math.min(turn, replies.length - 1)];
+      turn += 1;
+      if (resume) {
+        yield { sessionId: `${id}-conversation`, type: "session" };
+      }
       for (const event of options.emit ?? []) {
         yield event;
       }

@@ -8,8 +8,16 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { createAnyAgentGateway, describeEvent, toWizardEvent } from "../lib/agent";
+import { asSchemaFailure, createAnyAgentGateway, describeEvent, toWizardEvent } from "../lib/agent";
 import { fakeAdapter, fakeProbe } from "./fixtures";
+
+/** Drain a run's events and resolve with its result. */
+async function drain(run: { done: Promise<{ json?: unknown; text: string }>; events: AsyncIterable<unknown> }) {
+  for await (const _event of run.events) {
+    // the spinner's job in production; nothing to assert here
+  }
+  return await run.done;
+}
 
 describe("createAnyAgentGateway — detection", () => {
   it("returns nothing when no agent is on PATH, which is the fallback trigger", async () => {
@@ -100,21 +108,15 @@ describe("createAnyAgentGateway — running", () => {
     });
 
     const runner = await gateway.open("fake-agent");
-    const run = runner.run("investigate", {
-      cwd: process.cwd(),
-      readOnly: true,
-      schema: { properties: { typescript: { type: "boolean" } }, required: ["typescript"], type: "object" },
-    });
+    const result = await drain(
+      runner.run("investigate", {
+        cwd: process.cwd(),
+        readOnly: true,
+        schema: { properties: { typescript: { type: "boolean" } }, required: ["typescript"], type: "object" },
+      }),
+    );
 
-    for await (const _event of run.events) {
-      // drain
-    }
-
-    expect((await run.done).json).toEqual({
-      framework: { name: "next" },
-      packageManager: "pnpm",
-      typescript: true,
-    });
+    expect(result.json).toEqual({ framework: { name: "next" }, packageManager: "pnpm", typescript: true });
   });
 
   it("does not ask for read-only on an agent that cannot guarantee it", async () => {
@@ -128,6 +130,144 @@ describe("createAnyAgentGateway — running", () => {
     // passed to an agent without it; the gateway must drop it instead.
     const run = runner.run("investigate", { cwd: process.cwd(), readOnly: true });
     expect((await run.done).text).toBe("ok");
+  });
+});
+
+describe("createAnyAgentGateway — sessions", () => {
+  const schema = { properties: { summary: { type: "string" } }, required: ["summary"], type: "object" };
+
+  it("runs several turns in one conversation", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [fakeAdapter({ replies: ["read the code", "wired it up", "moved it"], resume: "native" })],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    const session = runner.session({ cwd: process.cwd() });
+
+    expect((await drain(session.run("investigate", { readOnly: true }))).text).toBe("read the code");
+    expect((await drain(session.run("implement"))).text).toBe("wired it up");
+    expect((await drain(session.run("now move it"))).text).toBe("moved it");
+
+    await session.close();
+  });
+
+  it("refuses new turns once the conversation is closed", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [fakeAdapter({ resume: "native" })],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    const session = runner.session({ cwd: process.cwd() });
+    await drain(session.run("do it"));
+    await session.close();
+
+    expect(() => session.run("and again")).toThrow();
+  });
+
+  it("throws for an agent that cannot continue a conversation, which is the fallback trigger", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [fakeAdapter({ resume: false })],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    expect(() => runner.session({ cwd: process.cwd() })).toThrow("cannot continue a conversation");
+  });
+
+  it("does not ask for read-only on a session turn the agent cannot guarantee", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [fakeAdapter({ readOnly: false, reply: "ok", resume: "native" })],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    const session = runner.session({ cwd: process.cwd() });
+    // AnyAgent throws UnsupportedCapability before spawning if `readOnly` is
+    // passed to an agent without it; the gateway must drop it instead.
+    expect((await drain(session.run("investigate", { readOnly: true }))).text).toBe("ok");
+  });
+
+  it("validates a turn against a schema", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [fakeAdapter({ reply: JSON.stringify({ summary: "did the thing" }), resume: "native" })],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    const session = runner.session({ cwd: process.cwd() });
+
+    expect((await drain(session.run("implement", { schema, schemaRetries: 0 }))).json).toEqual({
+      summary: "did the thing",
+    });
+  });
+
+  it("fails a bad reply once, without re-running an editing turn, and keeps the reply", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [
+        fakeAdapter({
+          replies: ["I changed four files.", JSON.stringify({ summary: "second turn" })],
+          resume: "native",
+        }),
+      ],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    const session = runner.session({ cwd: process.cwd() });
+
+    const failure = await session
+      .run("implement", { schema, schemaRetries: 0 })
+      .done.then(() => null)
+      .catch((error: unknown) => asSchemaFailure(error));
+
+    expect(failure).not.toBeNull();
+    expect(failure?.raw).toBe("I changed four files.");
+    expect(failure?.issues.length).toBeGreaterThan(0);
+
+    // The second reply was never consumed, so the turn ran exactly once: the
+    // conversation picks it up on the next turn instead.
+    expect((await drain(session.run("try again", { schema }))).json).toEqual({ summary: "second turn" });
+  });
+
+  it("re-asks a read-only turn, where a second run costs nothing but time", async () => {
+    const gateway = createAnyAgentGateway({
+      adapters: [fakeAdapter({ replies: ["not json", JSON.stringify({ summary: "second try" })], resume: "native" })],
+      probe: fakeProbe(["fake-agent"]),
+    });
+
+    const runner = await gateway.open("fake-agent");
+    const session = runner.session({ cwd: process.cwd() });
+    const run = session.run("investigate", { readOnly: true, schema });
+
+    const seen: string[] = [];
+    for await (const event of run.events) {
+      seen.push(event.type);
+    }
+
+    expect(seen).toContain("schema-retry");
+    expect((await run.done).json).toEqual({ summary: "second try" });
+  });
+});
+
+describe("asSchemaFailure", () => {
+  it("recognises a schema failure and keeps the reply that caused it", () => {
+    expect(asSchemaFailure({ code: "Parse", issues: ["$.summary: required"], raw: "prose" })).toEqual({
+      issues: ["$.summary: required"],
+      raw: "prose",
+    });
+  });
+
+  it("tolerates a failure that carries nothing useful", () => {
+    expect(asSchemaFailure({ code: "Parse" })).toEqual({ issues: [], raw: "" });
+  });
+
+  it("passes every other failure through as not-a-schema-failure", () => {
+    expect(asSchemaFailure({ code: "Invocation" })).toBeNull();
+    expect(asSchemaFailure(new Error("the CLI exited 1"))).toBeNull();
+    expect(asSchemaFailure("nope")).toBeNull();
+    expect(asSchemaFailure(null)).toBeNull();
   });
 });
 

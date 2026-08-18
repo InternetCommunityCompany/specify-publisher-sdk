@@ -30,9 +30,19 @@ no credentials leave your machine.
 4. **Shows you the plan** and waits for your confirmation.
 5. **Writes the integration**, with the full API reference in the prompt so the
    agent works from the current API rather than its training data.
-6. **Verifies.** The wizard itself — not the agent — scans your tree for the
+6. **Reports back, and stays on the line.** Every editing turn answers with a
+   structured report — what it changed, file by file; the decisions it made on
+   your behalf; anything you need to know about, like a consent stub where you
+   have no CMP; and any question it could not settle from the code.
+7. **Talks it through with you.** You are then asked what next: finish, request
+   changes in your own words, answer its questions, or abort. Changes and
+   answers go back as another turn of the *same* conversation, so the agent
+   still has everything it read and wrote — it amends its work rather than
+   starting over. There is no turn limit; you leave the loop when you are done.
+8. **Verifies.** The wizard itself — not the agent — scans your tree for the
    calls that had to be there, prints `git diff --stat`, and tells you what is
-   missing.
+   missing. If something required is missing, it offers to hand that straight
+   back to the agent as one more change request.
 
 ## Options
 
@@ -50,6 +60,16 @@ no credentials leave your machine.
 npx @specify-sh/wizard --publisher --key spk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 npx @specify-sh/wizard --advertiser --dry-run
 ```
+
+`--yes` is the CI shape: one investigation turn, one implementation turn, then
+verification. There is no conversation, because there is nobody to have it with
+— if the agent asked questions, they are printed and flagged rather than
+answered. `--dry-run` stops after the investigation and changes nothing.
+
+A few agents cannot hold a multi-turn conversation at all (their CLI has no way
+to continue an earlier one). The wizard says so, runs the same investigation and
+implementation as separate one-shot runs, and skips the follow-up loop: a
+follow-up to an agent with no memory of the diff is worse than none.
 
 ## If you have no coding agent
 

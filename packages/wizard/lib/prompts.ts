@@ -10,14 +10,24 @@ import { isPlaceholderKey } from "./keys";
 import { PRODUCTS, type ProductId, installCommand } from "./products";
 import { type Recon, renderReconForPrompt } from "./recon";
 import { referenceFor } from "./references";
+import type { TurnQuestion } from "./report";
 
 /** Extra system instructions applied to every run the wizard starts. */
 export const SYSTEM_PROMPT = `You are integrating a third-party SDK into someone else's working codebase on their behalf, from a setup wizard they ran.
 
 Their trust budget is one reviewable diff. Change only what the integration needs, follow the conventions already in the files you touch, and never refactor, reformat or "improve" code that is not part of the integration. If something is ambiguous, choose the smaller change and say so in your final message rather than guessing large.`;
 
-/** The guardrails repeated in every implementation prompt. */
-export function implementationRules(product: ProductId, key: string): string[] {
+/**
+ * The guardrails repeated in every implementation prompt.
+ *
+ * @param product - Which SDK is being installed
+ * @param key - The key to write in, real or placeholder
+ * @param report - Whether the turn asks for a structured report. False on
+ *   agents that cannot do structured output, where asking for JSON would only
+ *   put JSON where the user expects prose.
+ * @returns The rules, in prompt order
+ */
+export function implementationRules(product: ProductId, key: string, report = true): string[] {
   const spec = PRODUCTS[product];
   const rules = [
     "Touch only the files the integration actually requires. No refactors, no reformatting, no unrelated cleanups, no changes to lint or build config unless the integration cannot work without them.",
@@ -45,7 +55,9 @@ export function implementationRules(product: ProductId, key: string): string[] {
     `Install with the project's own package manager. Do not switch package managers and do not edit the lockfile by hand.`,
     "In a single-page app, call `destroy()` from the teardown path of whatever created the client, where the framework has such a lifecycle.",
     "The SDK is browser-only. Keep the client and all of its calls out of server-rendered and build-time code paths.",
-    "Finish by summarising, in your final message: every file you changed, where consent is wired, where `identify()` is wired, and anything you left for the developer to finish.",
+    report
+      ? "Finish by answering with the JSON report the schema describes — that report, not a closing prose message, is what the developer will read. Every file you touched belongs in filesChanged; the summary must say where consent is wired, where `identify()` is wired, and anything you left for the developer to finish; and anything genuinely ambiguous belongs in questions rather than being guessed at."
+      : "Finish by summarising, in your final message: every file you changed, where consent is wired, where `identify()` is wired, and anything you left for the developer to finish.",
   );
 
   if (isPlaceholderKey(key)) {
@@ -104,6 +116,8 @@ export interface ImplementationPromptInput {
   product: ProductId;
   /** Findings from the recon pass, or null when recon was skipped. */
   recon: Recon | null;
+  /** Whether the turn is being given the turn-report schema. Defaults to true. */
+  report?: boolean;
 }
 
 /**
@@ -117,7 +131,7 @@ export interface ImplementationPromptInput {
  * @returns The implementation prompt
  */
 export function buildImplementationPrompt(input: ImplementationPromptInput): string {
-  const { dir, key, product, recon } = input;
+  const { dir, key, product, recon, report = true } = input;
   const spec = PRODUCTS[product];
   const manager = recon?.packageManager ?? "npm";
 
@@ -149,7 +163,7 @@ ${findings}
 
 ## Rules
 
-${numbered(implementationRules(product, key))}`;
+${numbered(implementationRules(product, key, report))}`;
 }
 
 /**
@@ -161,4 +175,54 @@ ${numbered(implementationRules(product, key))}`;
  */
 export function buildCombinedPrompt(input: Omit<ImplementationPromptInput, "recon">): string {
   return buildImplementationPrompt({ ...input, recon: null });
+}
+
+/** Why a follow-up turn is being taken. */
+export type FollowUpKind = "answers" | "changes" | "verification";
+
+export interface FollowUpPromptInput {
+  kind: FollowUpKind;
+  /** What the developer typed, or what the verification scan found. */
+  message: string;
+  /** The questions being answered. Only read when `kind` is "answers". */
+  questions?: TurnQuestion[];
+}
+
+const FOLLOW_UP_OPENING: Record<FollowUpKind, string> = {
+  answers: "The developer has answered the questions you asked.",
+  changes: "The developer has reviewed what you just did and wants changes.",
+  verification:
+    "The wizard scanned the project after your changes and a required part of the integration is still missing.",
+};
+
+/**
+ * The prompt for a turn that continues the conversation.
+ *
+ * Deliberately short. The session already holds the API reference, the recon
+ * findings, the key and every guardrail from the first turn, and resending them
+ * every turn would both cost tokens and invite the agent to redo work it has
+ * already done. This says what changed and reminds it that the rules still
+ * stand — nothing else.
+ *
+ * @param input - Why the turn is being taken and what the developer said
+ * @returns The follow-up prompt
+ */
+export function buildFollowUpPrompt(input: FollowUpPromptInput): string {
+  const { kind, message, questions = [] } = input;
+
+  const asked =
+    kind === "answers" && questions.length > 0
+      ? `\nYou asked:\n\n${questions.map((item, index) => `${index + 1}. ${item.question}`).join("\n")}\n\nTheir answer:`
+      : "";
+
+  return `${FOLLOW_UP_OPENING[kind]}
+${asked}
+
+"""
+${message.trim()}
+"""
+
+Everything from this conversation still applies: the same API reference, the same key exactly as given, the same consent and \`identify()\` rules, and the same blast radius — change only what this needs. Do not redo work nobody questioned, do not start over, and do not add anything that was not asked for. If this makes an earlier decision wrong, change that decision rather than layering another on top of it.
+
+Then answer with the same JSON report as before, describing this turn only.`;
 }
