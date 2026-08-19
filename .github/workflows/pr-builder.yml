@@ -1,9 +1,9 @@
 name: 📦 PR Builder
 
 on:
+  # No branch filter: stacked PRs (feature branch -> feature branch) need CI
+  # before they retarget to main.
   pull_request:
-    branches:
-      - main
 
 env:
   NPM_CONFIG_PROVENANCE: true
