@@ -1,0 +1,26 @@
+{
+  "name": "@specify-sh/advertiser",
+  "version": "1.0.0",
+  "description": "JS SDK for Specify Advertisers — funnel analytics",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.mts",
+    "types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "files": ["dist"],
+  "keywords": ["specify", "advertiser-sdk", "analytics", "cptx"],
+  "author": "Specify",
+  "license": "MIT",
+  "homepage": "https://specify.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InternetCommunityCompany/specify-publisher-sdk.git"
+  },
+  "bugs": "https://github.com/InternetCommunityCompany/specify-publisher-sdk/issues",
+  "devDependencies": {
+    "@specify-sh/core": "workspace:*"
+  }
+}

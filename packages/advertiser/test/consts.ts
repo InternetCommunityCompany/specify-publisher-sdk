@@ -1,0 +1,3 @@
+export const VALID_MOCK_PROPERTY_KEY = "adv_1234567890abcdef1234567890abcd";
+export const VALID_MOCK_WALLET_ADDRESS = "0x1234567890123456789012345678901234567890";
+export const EVENTS_ENDPOINT = "https://spfsrv.com/v1/events";
